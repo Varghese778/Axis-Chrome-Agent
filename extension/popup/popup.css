@@ -1,0 +1,27 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { width: 320px; min-height: 400px; font-family: 'Google Sans', sans-serif; background: #1a1a2e; color: #e0e0e0; }
+#app { padding: 16px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.logo { font-size: 18px; font-weight: 600; color: #4fc3f7; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.status-dot.connected { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
+.status-dot.disconnected { background: #666; }
+.status-dot.listening { background: #ff9800; box-shadow: 0 0 6px #ff9800; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.section { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.hidden { display: none !important; }
+.transcript { width: 100%; min-height: 120px; background: #0d1117; border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.5; overflow-y: auto; max-height: 160px; }
+.transcript .user { color: #4fc3f7; }
+.transcript .pilot { color: #a5d6a7; }
+.transcript .hint { color: #555; font-style: italic; }
+.mic-btn { width: 72px; height: 72px; border-radius: 50%; background: #1565c0; border: none; cursor: pointer; font-size: 28px; transition: all 0.2s; }
+.mic-btn:hover:not(:disabled) { background: #1976d2; transform: scale(1.05); }
+.mic-btn.listening { background: #c62828; animation: pulse 0.8s infinite; }
+.mic-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mode-badge { font-size: 11px; background: #263238; padding: 4px 10px; border-radius: 12px; color: #78909c; }
+.mode-badge.webmcp { background: #1b5e20; color: #a5d6a7; }
+.mode-badge.dom { background: #0d47a1; color: #90caf9; }
+.btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
+.btn.primary { background: #1976d2; color: white; width: 100%; }
+.btn.small { background: transparent; color: #666; font-size: 12px; }
+.footer { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: 12px; color: #555; }

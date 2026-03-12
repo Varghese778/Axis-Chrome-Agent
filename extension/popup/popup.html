@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PagePilot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <div class="logo">&#x1F9ED; PagePilot</div>
+      <div id="status-dot" class="status-dot disconnected"></div>
+    </div>
+
+    <div id="auth-section" class="section">
+      <button id="sign-in-btn" class="btn primary">Sign in with Google</button>
+    </div>
+
+    <div id="main-section" class="section hidden">
+      <div id="transcript" class="transcript">
+        <p class="hint">Tap mic and speak a command...</p>
+      </div>
+
+      <button id="mic-btn" class="mic-btn" disabled>
+        <span class="mic-icon">&#x1F3A4;</span>
+      </button>
+
+      <div id="mode-badge" class="mode-badge">--</div>
+
+      <div class="footer">
+        <span id="user-name"></span>
+        <button id="sign-out-btn" class="btn small">Sign out</button>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

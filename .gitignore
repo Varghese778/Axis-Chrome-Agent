@@ -1,0 +1,51 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+
+# Reference files (not shipped)
+references/
+refrences/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# GCP & Secrets
+application_default_credentials.json
+.env
+*.pem
+*.key
+
+# Logs
+logs/
+*.log
+logs.txt
+
+# Chrome Extension
+extension.crx
+
+# Utilities
+system_check.py
+analyze_logs.py
+id.py
+tests/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
