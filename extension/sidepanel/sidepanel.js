@@ -535,6 +535,11 @@ function handleMessage(msg, sock) {
       showGeneratingBubble();
     }
   } else if (msg.type === 'tool_result' && msg.tool === 'generate_image') {
+    // In chat view, remove the '...' thinking bubble since the image IS the response
+    if (currentView === 'chat') {
+      const thinkingBubble = document.querySelector('.chat-bubble.agent.partial');
+      if (thinkingBubble) thinkingBubble.remove();
+    }
     const generatingBubble = document.querySelector('.generating-bubble');
     if (generatingBubble) {
       resolveImageMessage(generatingBubble, msg.data);
@@ -1590,12 +1595,7 @@ function resolveImageMessage(anchorEl, data) {
         footer.appendChild(caption);
     }
     
-    if (data.prompt) {
-        const prompt = document.createElement('div');
-        prompt.className = 'image-prompt';
-        prompt.textContent = `Prompt: ${data.prompt}`;
-        footer.appendChild(prompt);
-    }
+    // Prompt text intentionally hidden from UI for cleaner look
     
     const downloadBtn = document.createElement('button');
     downloadBtn.className = 'image-download-btn';

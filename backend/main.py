@@ -1251,6 +1251,17 @@ CHAT_TOOL_DECLARATIONS = types.Tool(function_declarations=[
             required=["action"],
         ),
     ),
+    types.FunctionDeclaration(
+        name="generate_image",
+        description="Generate an image from a text description and return it to the user. Use this when the user asks to draw, create, generate, or visualise something.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "prompt": types.Schema(type="STRING", description="A detailed text description of the image to generate."),
+            },
+            required=["prompt"],
+        ),
+    ),
 ])
 
 
@@ -1308,6 +1319,27 @@ async def _execute_chat_tool(state: SessionState, tool_name: str, args: dict) ->
             if action in ("navigate", "go_back", "go_forward", "refresh"):
                 await asyncio.sleep(1.0)
             return result, None
+
+        elif tool_name == "generate_image":
+            prompt = args.get("prompt", "")
+            if not prompt:
+                return {"success": False, "error": "'generate_image' requires a prompt"}, None
+            # Send tool_start to UI for generating bubble
+            try:
+                await state.websocket.send_json({"type": "tool_start", "tool": "generate_image"})
+            except Exception:
+                pass
+            # Call the REST endpoint
+            import httpx
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                try:
+                    resp = await client.post("http://localhost:8080/generate-image", json={"prompt": prompt, "session_id": state.session_id})
+                    resp.raise_for_status()
+                    result = resp.json()
+                    return result, None
+                except Exception as e:
+                    logger.error(f"Chat generate_image error: {e}")
+                    return {"success": False, "error": str(e)}, None
 
         else:
             return {"success": False, "error": f"Unknown tool: {tool_name}"}, None
