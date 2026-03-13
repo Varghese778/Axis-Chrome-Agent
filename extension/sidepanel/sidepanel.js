@@ -16,6 +16,8 @@ let chatWs = null;              // WebSocket for chat sessions (tool bridge)
 let isListening = false;
 let isHolding = false;
 let currentTabId = null;
+let currentUrl = '';
+let currentTitle = '';
 let currentUser = null;
 let currentView = 'idle'; // idle | live | settings
 let wsConnecting = false;
@@ -41,12 +43,16 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
     currentTabId = String(tab.id);
+    currentUrl = tab.url || '';
+    currentTitle = tab.title || '';
     if (ws?.readyState === WebSocket.OPEN) sendPageContext(tab, ws);
     if (chatWs?.readyState === WebSocket.OPEN) sendPageContext(tab, chatWs);
   } catch (e) { /* tab closed */ }
 });
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && String(tabId) === currentTabId && changeInfo.url) {
+  if (changeInfo.status === 'complete' && String(tabId) === currentTabId) {
+    if (changeInfo.url) currentUrl = changeInfo.url;
+    if (changeInfo.title) currentTitle = changeInfo.title;
     if (ws?.readyState === WebSocket.OPEN) sendPageContext(tab, ws);
     if (chatWs?.readyState === WebSocket.OPEN) sendPageContext(tab, chatWs);
   }
@@ -307,6 +313,8 @@ function connectWS(userId, token) {
 
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       currentTabId = String(tab.id);
+      currentUrl = tab.url || '';
+      currentTitle = tab.title || '';
 
       // Wait for backend 'ready' signal before sending auth
       const authPayload = JSON.stringify({
@@ -349,7 +357,7 @@ function connectWS(userId, token) {
               sendPageContext(tab);
               goLiveBtn.disabled = false;
             }
-          } catch {}
+          } catch { }
         }
         // Restore original handler and forward this message
         ws.onmessage = origOnMessage;
@@ -399,19 +407,19 @@ function sendPageContext(tab, targetWs) {
   const title = tab.title || '';
   if (isRestrictedUrl(url)) {
     if (s?.readyState === WebSocket.OPEN) {
-      s.send(JSON.stringify({ type: 'page_context', url, title: title || 'New Tab', webmcp_available: false, webmcp_tools: [], session_id: SESSION_ID }));
+      s.send(JSON.stringify({ type: 'page_context', url, title: title || 'New Tab', webmcp_available: false, webmcp_tools: [], selected_tabs: selectedTabs, session_id: SESSION_ID }));
     }
     return;
   }
   chrome.runtime.sendMessage({ type: 'get_webmcp_tools' }, (response) => {
     if (chrome.runtime.lastError) {
       if (s?.readyState === WebSocket.OPEN) {
-        s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: false, webmcp_tools: [], session_id: SESSION_ID }));
+        s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: false, webmcp_tools: [], selected_tabs: selectedTabs, session_id: SESSION_ID }));
       }
       return;
     }
     if (s?.readyState === WebSocket.OPEN) {
-      s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: response?.available || false, webmcp_tools: response?.tools || [], session_id: SESSION_ID }));
+      s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: response?.available || false, webmcp_tools: response?.tools || [], selected_tabs: selectedTabs, session_id: SESSION_ID }));
     }
   });
 }
@@ -431,16 +439,16 @@ function handleMessage(msg, sock) {
   } else if (msg.type === 'agent_transcript' || msg.type === 'output_transcription') {
     if (msg.text) {
       showTranscript(msg.text, 'agent', !msg.is_partial);
-      
+
       // TRIGGER: If agent says they will generate/draw, show a simple text bubble immediately
       const lower = msg.text.toLowerCase();
       const keywords = ['generating', 'drawing', 'creating', 'painting', 'rendering', 'sketching', 'generated', 'visualizing'];
       const hasKeywords = keywords.some(k => lower.includes(k));
 
       if (hasKeywords) {
-          if (!document.querySelector('.generating-bubble') && !document.querySelector('.image-message-card')) {
-              showGeneratingBubble();
-          }
+        if (!document.querySelector('.generating-bubble') && !document.querySelector('.image-message-card')) {
+          showGeneratingBubble();
+        }
       }
     }
   } else if (msg.type === 'session_ended') {
@@ -448,55 +456,94 @@ function handleMessage(msg, sock) {
   } else if (msg.type === 'turn_complete') {
     // nothing special
   } else if (msg.type === 'status') {
-    // ignore
+    handleStatusMessage(msg);
   } else if (msg.type === 'error') {
     if (msg.message && !msg.message.toLowerCase().includes('cannot access')) {
       showTranscript(msg.message, 'agent', true);
     }
   } else if (msg.type === 'request_screenshot') {
-    // Check if active tab is restricted
-    const activeTabId = Number(currentTabId);
-    if (selectedTabs.some(t => t.id === activeTabId)) {
-      if (s?.readyState === WebSocket.OPEN) {
-        s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, error: 'tab_restricted', session_id: SESSION_ID }));
-      }
-      return;
-    }
-    chrome.runtime.sendMessage({ type: 'capture_screenshot', quality: 80 }, (response) => {
-      void chrome.runtime.lastError;
-      if (!response?.success || !response?.data) {
+    chrome.tabs.get(Number(currentTabId), (tab) => {
+      if (chrome.runtime.lastError || !tab) {
         if (s?.readyState === WebSocket.OPEN) {
-          s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, session_id: SESSION_ID }));
+          s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, error: 'tab_not_found', session_id: SESSION_ID }));
         }
         return;
       }
 
-      const img = new Image();
-      img.onload = () => {
-        const MAX_WIDTH = 960;
-        let width = img.width;
-        let height = img.height;
+      const activeUrl = tab.url || '';
+      const activeTabId = tab.id;
+      const restrictedPrefixes = ["chrome://", "about:", "chrome-extension://", "edge://"];
+      const isChromePage = restrictedPrefixes.some(p => activeUrl.toLowerCase().startsWith(p)) || !activeUrl;
+      const isRestrictedTab = selectedTabs.some(t => t.id === activeTabId);
 
-        if (width > MAX_WIDTH) {
-          height = Math.round((height * MAX_WIDTH) / width);
-          width = MAX_WIDTH;
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', ssQuality);
-        const compressedB64 = compressedDataUrl.replace(/^data:image\/jpeg;base64,/, '');
-
+      if (isChromePage || isRestrictedTab) {
+        handleStatusMessage({
+          type: 'status',
+          level: 'info',
+          message: "Restricted, Won't Peek here."
+        });
         if (s?.readyState === WebSocket.OPEN) {
-          s.send(JSON.stringify({ type: 'screenshot_result', data: compressedB64, success: true, session_id: SESSION_ID }));
+          s.send(JSON.stringify({
+            type: 'screenshot_result',
+            data: '',
+            success: false,
+            error: isChromePage ? 'chrome_internal_page' : 'tab_restricted',
+            session_id: SESSION_ID
+          }));
         }
-      };
+        return;
+      }
 
-      img.src = 'data:image/jpeg;base64,' + response.data;
+      // Show "Peek" notification before capturing
+      handleStatusMessage({
+        type: 'status',
+        level: 'info',
+        message: "Taking a look at the screen."
+      });
+
+      chrome.runtime.sendMessage({ type: 'capture_screenshot', quality: 80 }, (response) => {
+        void chrome.runtime.lastError;
+        if (!response?.success || !response?.data) {
+          if (s?.readyState === WebSocket.OPEN) {
+            s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, session_id: SESSION_ID }));
+          }
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          const MAX_WIDTH = 960;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', ssQuality);
+          const compressedB64 = compressedDataUrl.replace(/^data:image\/jpeg;base64,/, '');
+
+          if (s?.readyState === WebSocket.OPEN) {
+            s.send(JSON.stringify({ type: 'screenshot_result', data: compressedB64, success: true, session_id: SESSION_ID }));
+          }
+        };
+
+        img.onerror = (e) => {
+          console.error('[Axis] Screenshot img load error:', e);
+          if (s?.readyState === WebSocket.OPEN) {
+            s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, error: 'img_load_error', session_id: SESSION_ID }));
+          }
+        };
+
+        img.src = 'data:image/jpeg;base64,' + response.data;
+      });
     });
   } else if (msg.type === 'execute_webmcp') {
     chrome.runtime.sendMessage({ type: 'execute_webmcp', tool_name: msg.tool_name, args: msg.args }, (response) => {
@@ -600,16 +647,24 @@ if (addTabsBtn) {
       item.innerHTML = `<span class="${checkClass}"></span>${favicon}<span class="tab-title">${escapeHtml((tab.title || '').slice(0, 50))}</span>`;
       item.addEventListener('click', () => {
         const idx = selectedTabs.findIndex(t => t.id === tab.id);
+        const checkIcon = item.querySelector('.tab-check');
+
         if (idx >= 0) {
           selectedTabs.splice(idx, 1);
+          if (checkIcon) checkIcon.classList.remove('checked');
           chrome.storage.session.set({ axis_selected_tabs: selectedTabs });
           showToast(`${tab.title || 'Tab'} unrestricted`);
         } else {
           selectedTabs.push({ id: tab.id, title: tab.title || '', url: tab.url || '', favIconUrl: tab.favIconUrl || '' });
+          if (checkIcon) checkIcon.classList.add('checked');
           chrome.storage.session.set({ axis_selected_tabs: selectedTabs });
           showToast(`${tab.title || 'Tab'} restricted`);
         }
-        tabDropdown.classList.add('hidden');
+
+        // Immediate sync with backend
+        chrome.tabs.get(Number(currentTabId), (t) => {
+          if (!chrome.runtime.lastError && t) sendPageContext(t);
+        });
       });
       tabDropdown.appendChild(item);
     }
@@ -646,7 +701,6 @@ if (chatAddTabsBtn) {
       item.innerHTML = `${favicon}<span class="tab-title">${escapeHtml((tab.title || '').slice(0, 50))}</span>`;
       item.prepend(check);
       item.addEventListener('click', (ev) => {
-        ev.stopPropagation();
         const idx = selectedTabs.findIndex(t => t.id === tab.id);
         if (idx >= 0) {
           selectedTabs.splice(idx, 1);
@@ -659,6 +713,11 @@ if (chatAddTabsBtn) {
           chrome.storage.session.set({ axis_selected_tabs: selectedTabs });
           showChatToast(`${tab.title || 'Tab'} restricted`);
         }
+
+        // Immediate sync with backend
+        chrome.tabs.get(Number(currentTabId), (t) => {
+          if (!chrome.runtime.lastError && t) sendPageContext(t);
+        });
       });
       chatTabDropdown.appendChild(item);
     }
@@ -723,10 +782,20 @@ settingsBtn.addEventListener('click', openSettings);
 settingsBackBtn.addEventListener('click', closeSettings);
 settingsOverlay.addEventListener('click', closeSettings);
 
-newSessionBtn.addEventListener('click', () => {
+newSessionBtn.addEventListener('click', () => { resetSession(); });
+
+// Persistent error reset button
+const errorResetBtn = document.getElementById('error-reset-btn');
+if (errorResetBtn) {
+  errorResetBtn.addEventListener('click', () => { resetSession(); });
+}
+
+function resetSession() {
   SESSION_ID = crypto.randomUUID();
   clearTranscript();
   closeSettings();
+  document.getElementById('error-modal')?.classList.add('hidden');
+
   if (currentView === 'live') {
     switchView('idle');
     stopListening();
@@ -740,7 +809,7 @@ newSessionBtn.addEventListener('click', () => {
       }
     });
   }
-});
+}
 
 // Theme toggle
 themeToggle.addEventListener('change', () => {
@@ -749,36 +818,36 @@ themeToggle.addEventListener('change', () => {
 
 // Image Modal Listeners
 if (imageModal) {
-    modalCloseBtn.onclick = closeModal;
-    imageModal.onclick = (e) => {
-        if (e.target === imageModal) closeModal();
-    };
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && imageModal.classList.contains('visible')) {
-            closeModal();
-        }
-    });
+  modalCloseBtn.onclick = closeModal;
+  imageModal.onclick = (e) => {
+    if (e.target === imageModal) closeModal();
+  };
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && imageModal.classList.contains('visible')) {
+      closeModal();
+    }
+  });
 }
 
 function openModal(src) {
-    if (!imageModal || !modalImage) return;
-    modalImage.src = src;
-    imageModal.classList.add('visible');
-    
-    // Set up modal download
-    modalDownloadBtn.onclick = () => downloadImage(src);
+  if (!imageModal || !modalImage) return;
+  modalImage.src = src;
+  imageModal.classList.add('visible');
+
+  // Set up modal download
+  modalDownloadBtn.onclick = () => downloadImage(src);
 }
 
 function closeModal() {
-    if (imageModal) imageModal.classList.remove('visible');
+  if (imageModal) imageModal.classList.remove('visible');
 }
 
 function downloadImage(dataUrl) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `axis-vision-${timestamp}.png`;
-    link.click();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = `axis-vision-${timestamp}.png`;
+  link.click();
 }
 
 // ---------------------------------------------------------------------------
@@ -809,9 +878,16 @@ async function startListening() {
     };
 
     source.connect(micWorkletNode);
-    micWorkletNode.connect(micAudioContext.destination);
+    // micWorkletNode.connect(micAudioContext.destination); // REMOVED to prevent echo loopback
 
     isListening = true;
+
+    // Notify user that agent is live and ready for mic input
+    handleStatusMessage({
+      type: 'status',
+      level: 'info',
+      message: 'Please use earphones for better experience'
+    });
   } catch (err) {
     console.error('[Axis] Mic start failed:', err.message);
   }
@@ -821,7 +897,7 @@ function stopListening() {
   stopMicOnly();
   isListening = false;
   isHolding = false;
-  holdBtn.textContent = 'Hold';
+  holdBtn.textContent = 'Pause';
 }
 
 function stopMicOnly() {
@@ -950,7 +1026,7 @@ function showTranscript(text, role, isFinal) {
       lastBubbleEl = bubble;
       lastBubbleRole = role;
     }
-  } 
+  }
   // If final: overwrite active partial bubble with cumulative string, then seal
   else {
     if (lastBubbleEl && lastBubbleRole === role && lastBubbleEl.classList.contains('partial')) {
@@ -974,8 +1050,8 @@ function showTranscript(text, role, isFinal) {
   // De-spawn old bubbles at the top when exceeding max
   while (chatContainer.children.length > MAX_BUBBLES) {
     const oldest = chatContainer.firstElementChild;
-    oldest.classList.add('despawning');
-    oldest.addEventListener('animationend', () => oldest.remove(), { once: true });
+    // Remove immediately to prevent infinite while loop if animationend hasn't fired
+    oldest.remove();
   }
 }
 
@@ -986,7 +1062,7 @@ function clearTranscript() {
 }
 
 // Legacy stubs
-function showSilenceDots() {}
+function showSilenceDots() { }
 function clearEphemeral() { clearTranscript(); }
 
 // ---------------------------------------------------------------------------
@@ -1182,7 +1258,7 @@ async function loadRecentSessions() {
       <button class="session-delete" title="Delete">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 0 011 1v2"/>
         </svg>
       </button>`;
 
@@ -1270,7 +1346,7 @@ if (aboutBackBtn) aboutBackBtn.addEventListener('click', closeAbout);
 
 function closeChatWs() {
   if (chatWs) {
-    try { chatWs.send(JSON.stringify({ type: 'end_session' })); } catch {}
+    try { chatWs.send(JSON.stringify({ type: 'end_session' })); } catch { }
     chatWs.close();
     chatWs = null;
   }
@@ -1553,66 +1629,144 @@ if (saveInstructionsBtn) {
  * Shows a simple text bubble indicating image generation is in progress.
  */
 function showGeneratingBubble() {
-    const container = currentView === 'chat' ? chatMessagesEl : chatContainer;
-    if (!container) return null;
+  const container = currentView === 'chat' ? chatMessagesEl : chatContainer;
+  if (!container) return null;
 
-    // Dupe check
-    if (document.querySelector('.generating-bubble')) return null;
+  // Dupe check
+  if (document.querySelector('.generating-bubble')) return null;
 
-    const bubble = document.createElement('div');
-    bubble.className = 'chat-bubble agent generating-bubble';
-    bubble.textContent = 'Generating, please wait...';
-    
-    container.appendChild(bubble);
-    container.scrollTop = container.scrollHeight;
-    return bubble;
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble agent generating-bubble';
+  bubble.textContent = 'Generating, please wait...';
+
+  container.appendChild(bubble);
+  container.scrollTop = container.scrollHeight;
+  return bubble;
 }
 
 /**
  * Replaces a generating bubble or ghost element with the actual generated image card.
  */
 function resolveImageMessage(anchorEl, data) {
-    if (!anchorEl) return;
-    
-    const card = document.createElement('div');
-    card.className = 'image-message-card';
-    
-    const imgSrc = `data:${data.mime_type || 'image/png'};base64,${data.image_b64}`;
-    const img = document.createElement('img');
-    img.src = imgSrc;
-    img.alt = data.caption || 'Generated image';
-    
-    // Open modal on click
-    card.onclick = () => openModal(imgSrc);
-    
-    const footer = document.createElement('div');
-    footer.className = 'image-card-footer';
-    
-    if (data.caption) {
-        const caption = document.createElement('div');
-        caption.className = 'image-caption';
-        caption.textContent = data.caption;
-        footer.appendChild(caption);
+  if (!anchorEl) return;
+
+  const card = document.createElement('div');
+  card.className = 'image-message-card';
+
+  const imgSrc = `data:${data.mime_type || 'image/png'};base64,${data.image_b64}`;
+  const img = document.createElement('img');
+  img.src = imgSrc;
+  img.alt = data.caption || 'Generated image';
+
+  // Open modal on click
+  card.onclick = () => openModal(imgSrc);
+
+  const footer = document.createElement('div');
+  footer.className = 'image-card-footer';
+
+  if (data.caption) {
+    const caption = document.createElement('div');
+    caption.className = 'image-caption';
+    caption.textContent = data.caption;
+    footer.appendChild(caption);
+  }
+
+  // Prompt text intentionally hidden from UI for cleaner look
+
+  const downloadBtn = document.createElement('button');
+  downloadBtn.className = 'image-download-btn';
+  downloadBtn.textContent = 'Download';
+  downloadBtn.onclick = (e) => {
+    e.stopPropagation(); // Don't open modal
+    downloadImage(imgSrc);
+  };
+  footer.appendChild(downloadBtn);
+
+  card.appendChild(img);
+  card.appendChild(footer);
+
+  // Replace anchor with card
+  anchorEl.replaceWith(card);
+
+  // Scroll to bottom
+  const container = currentView === 'chat' ? chatMessagesEl : chatContainer;
+  if (container) container.scrollTop = container.scrollHeight;
+}
+/**
+ * Handles real-time status updates from the backend.
+ */
+function handleStatusMessage(msg) {
+  let container = document.getElementById('status-notification-container');
+  // Use the live-status-container if we are in live view and it's NOT a fatal error
+  if (currentView === 'live' && msg.level !== 'error') {
+    const liveContainer = document.getElementById('live-status-container');
+    if (liveContainer) {
+      container = liveContainer;
+      // Clear previous messages in live view to ensure only the latest status is visible
+      container.innerHTML = '';
     }
-    
-    // Prompt text intentionally hidden from UI for cleaner look
-    
-    const downloadBtn = document.createElement('button');
-    downloadBtn.className = 'image-download-btn';
-    downloadBtn.textContent = 'Download';
-    downloadBtn.onclick = (e) => {
-        e.stopPropagation(); // Don't open modal
-        downloadImage(imgSrc);
-    };
-    footer.appendChild(downloadBtn);
-    
-    card.appendChild(img);
-    card.appendChild(footer);
-    
-    // Replace anchor with card
-    anchorEl.replaceWith(card);
-    
-    // Scroll to bottom
-    const container = currentView === 'chat' ? chatMessagesEl : chatContainer;
-    if (container) container.scrollTop = container.scrollHeight;
+  }
+
+  if (!container) return;
+
+  if (msg.level === 'error') {
+    const modal = document.getElementById('error-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      const msgEl = document.getElementById('error-message');
+      if (msgEl) msgEl.textContent = msg.message;
+    }
+    // Remove all warning banners if there's a fatal error
+    container.innerHTML = '';
+    return;
+  }
+
+  const banner = document.createElement('div');
+  const level = msg.level || 'info';
+  banner.className = `status-banner ${level}`;
+
+  const icon = level === 'warning' ? '✦' : level === 'info' ? '✦' : '✦';
+
+  let countdownPart = '';
+  if (level === 'warning' && msg.countdown) {
+    let timeLeft = msg.countdown;
+    const isReconnecting = msg.message.toLowerCase().includes('reconnect') || msg.message === 'please wait...';
+
+    if (isReconnecting && msg.retry_attempt !== undefined && msg.total_attempts !== undefined) {
+      countdownPart = ` Retrying in <span class="countdown-num">${timeLeft}</span>s (Attempt ${msg.retry_attempt}/${msg.total_attempts})`;
+    } else if (isReconnecting) {
+      countdownPart = ` <span class="countdown-num">${timeLeft}</span>s`;
+    } else {
+      countdownPart = ` Retrying in <span class="countdown-num">${timeLeft}</span>s`;
+    }
+
+    // Local setInterval for countdown
+    const interval = setInterval(() => {
+      timeLeft--;
+      const numEl = banner.querySelector('.countdown-num');
+      if (numEl) numEl.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        if (isReconnecting && !isListening) {
+          // If we reach 0 and still not listening, it's a failure
+          // The backend will send a final error, but we want to make sure
+        }
+      }
+    }, 1000);
+
+    // Auto-remove warning banner just before retry/timeout (countdown + a bit)
+    setTimeout(() => {
+      banner.style.opacity = '0';
+      setTimeout(() => banner.remove(), 300);
+    }, (msg.countdown * 1000) - 200);
+  } else {
+    // All other banners (info, authenticated without level, etc.) auto-remove after 3.5s
+    setTimeout(() => {
+      banner.style.opacity = '0';
+      setTimeout(() => banner.remove(), 300);
+    }, 3500);
+  }
+
+  banner.innerHTML = `<span>${icon}</span> <span>${msg.message}${countdownPart}</span>`;
+  container.appendChild(banner);
 }

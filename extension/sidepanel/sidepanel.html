@@ -10,6 +10,9 @@
 
 <body>
   <div id="app">
+    <!-- Status Notification Banner -->
+    <div id="status-notification-container" class="status-notification-container"></div>
+
 
     <!-- Screen 1: HOME (unauthenticated) -->
     <div id="screen-home" class="screen active">
@@ -140,6 +143,7 @@
         <!-- Live tab restriction button (moved to bottom) -->
         <div class="live-bottom">
           <canvas id="live-visualizer" class="visualizer-canvas-sm" width="300" height="60"></canvas>
+          <div id="live-status-container" class="live-status-container"></div>
           <button id="end-session-btn" class="btn-pill btn-end">End Session</button>
           <button id="hold-btn" class="btn-pill btn-hold">Hold</button>
           <button id="add-tabs-btn" class="btn-pill btn-restrict" style="margin-left:8px">Restrict Tabs</button>
@@ -334,6 +338,16 @@
         <button id="modal-download-btn" class="btn-modal btn-modal-download">Download</button>
         <button id="modal-close-btn" class="btn-modal btn-modal-close">Close</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Persistent Error Modal -->
+  <div id="error-modal" class="error-modal hidden">
+    <div class="error-modal-content">
+      <div class="error-icon">⚠️</div>
+      <h2 id="error-title">Service Interrupted</h2>
+      <p id="error-message">The AI service is currently unavailable. Please start a new session to continue.</p>
+      <button id="error-reset-btn" class="btn-pill btn-error-reset">Start New Session</button>
     </div>
   </div>
 

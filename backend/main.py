@@ -39,7 +39,7 @@ from google.adk.runners import InMemoryRunner
 from google.genai import types
 from google.genai.types import Blob
 import google.genai as genai
-from google.genai.errors import APIError
+from google.genai.errors import APIError, ClientError
 
 from agent.Axis_agent import SYSTEM_PROMPT, root_agent
 from backend.firestore_client import firestore_client
@@ -67,7 +67,10 @@ _fh.setLevel(logging.DEBUG)
 _sh = logging.StreamHandler()
 _sh.setFormatter(_fmt)
 _sh.setLevel(logging.INFO)
-logging.basicConfig(level=logging.DEBUG, handlers=[_sh, _fh])
+logging.basicConfig(level=logging.INFO, handlers=[_sh, _fh])
+logging.getLogger("google_adk").setLevel(logging.WARNING)
+logging.getLogger("websockets").setLevel(logging.WARNING)
+logging.getLogger("google.genai").setLevel(logging.WARNING)
 
 class ADKDisconnectFilter(logging.Filter):
     def filter(self, record):
@@ -197,7 +200,6 @@ def _prune_context(history: list, max_turns: int = 20):
                     image_found = True
                 else:
                     # Replace with text part
-                    from google.genai import types
                     new_parts.append(types.Part.from_text(text="[Previous screenshot omitted to save memory]"))
             else:
                 new_parts.append(part)
@@ -241,6 +243,7 @@ class SessionState:
         self.page_title: str = ""
         self.webmcp_available: bool = False
         self.webmcp_tools: list = []
+        self.selected_tabs: list = []  # Restricted tabs list from extension
 
         # Document context
         self.documents: dict = {}
@@ -318,8 +321,8 @@ class SessionState:
                     automatic_activity_detection=types.AutomaticActivityDetection(
                         start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
                         end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
-                        prefix_padding_ms=0,
-                        silence_duration_ms=0,
+                        prefix_padding_ms=200,
+                        silence_duration_ms=300,
                     )
                 ),
                 response_modalities=[types.Modality.AUDIO],
@@ -357,6 +360,17 @@ class SessionState:
     ) -> Optional[str]:
         import time as _time
         _t0 = _time.monotonic()
+        # Check for restricted URL or tab early to avoid unnecessary WebSocket roundtrips
+        restricted_prefixes = ["chrome://", "about:", "chrome-extension://", "edge://"]
+        current_url = self.page_url.lower() if self.page_url else ""
+        is_chrome_page = any(current_url.startswith(p) for p in restricted_prefixes) or not current_url
+        is_restricted_tab = any(str(t.get('id')) == str(self.tab_id) for t in self.selected_tabs)
+
+        if is_chrome_page:
+            return "CHROME_INTERNAL_PAGE: Screenshots unavailable on internal pages."
+        if is_restricted_tab:
+            return "TAB_RESTRICTED: This tab is restricted by the user."
+
         # RETURN CACHED IF VALID (under 3 seconds old)
         now = asyncio.get_event_loop().time()
         if self.cached_screenshot and (now - self.screenshot_cached_at) < 3.0:
@@ -372,6 +386,9 @@ class SessionState:
             pass
         try:
             result = await asyncio.wait_for(self._screenshot_future, timeout=timeout)
+            if isinstance(result, str) and result.startswith("ERROR:"):
+                logger.warning(f"[screenshot] FAILED ({result}) session={session_id}")
+                return None
             logger.info(f"[screenshot] Captured ({_time.monotonic()-_t0:.1f}s) session={session_id}")
             return result
         except asyncio.TimeoutError:
@@ -402,10 +419,14 @@ class SessionState:
             self._screenshot_future = None
             self._predicting_screenshot = False
 
-    def resolve_screenshot(self, jpeg_b64: str):
+    def resolve_screenshot(self, data: str, success: bool = True):
         if self._screenshot_future and not self._screenshot_future.done():
-            self._screenshot_future.set_result(jpeg_b64)
-            logger.debug(f"[screenshot] resolved, size={len(jpeg_b64)} chars")
+            if success:
+                self._screenshot_future.set_result(data)
+                logger.debug(f"[screenshot] resolved, size={len(data)} chars")
+            else:
+                self._screenshot_future.set_result(f"ERROR: {data}")
+                logger.warning(f"[screenshot] resolved with error: {data}")
 
     # -- webmcp future pattern ----------------------------------------------
 
@@ -496,8 +517,8 @@ class SessionState:
                 automatic_activity_detection=types.AutomaticActivityDetection(
                     start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
                     end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
-                    prefix_padding_ms=0,
-                    silence_duration_ms=0,
+                    prefix_padding_ms=200,
+                    silence_duration_ms=300,
                 )
             ),
             response_modalities=[types.Modality.AUDIO],
@@ -613,7 +634,9 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
                     for attr_name in ('history', 'messages', 'events'):
                         hist = getattr(state.adk_session, attr_name, None)
                         if hist is not None and isinstance(hist, list):
-                            _prune_context(hist, max_turns=20)
+                            # Only prune if history exceeds a buffer to reduce overhead
+                            if len(hist) > 25:
+                                _prune_context(hist, max_turns=20)
                             break
 
                 if getattr(event, 'turn_complete', False) or getattr(event, 'interrupted', False):
@@ -764,16 +787,22 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
                             continue
                         for part in event.content.parts:
                             if getattr(part, 'function_call', None):
-                                if part.function_call.name == "generate_image":
-                                    logger.info(f"Model function call detected: {part.function_call.name}. Broadcasting tool_start via WS.")
-                                    try:
+                                fn_name = part.function_call.name
+                                try:
+                                    # Check for restricted URL or tab
+                                    restricted_prefixes = ["chrome://", "about:", "chrome-extension://", "edge://"]
+                                    current_url = state.page_url.lower() if state.page_url else ""
+                                    is_chrome_page = any(current_url.startswith(p) for p in restricted_prefixes) or not current_url
+                                    is_restricted_tab = any(str(t.get('id')) == str(state.tab_id) for t in state.selected_tabs)
+                                    
+                                    if fn_name == "generate_image":
                                         await websocket.send_json({"type": "tool_start", "tool": "generate_image"})
-                                    except Exception as e:
-                                        logger.error(f"Failed to send tool_start: {e}")
+                                except Exception as e:
+                                    logger.error(f"Failed to send tool status: {e}")
 
                             if (
                                 getattr(part, 'inline_data', None)
-                                and part.inline_data.mime_type.startswith("audio/pcm")
+                                and part.inline_data.mime_type.startswith("audio/")
                             ):
                                 try:
                                     await websocket.send_bytes(part.inline_data.data)
@@ -792,7 +821,7 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
                         for part in event.content.parts:
                             if (
                                 getattr(part, 'inline_data', None)
-                                and part.inline_data.mime_type.startswith("audio/pcm")
+                                and part.inline_data.mime_type.startswith("audio/")
                             ):
                                 try:
                                     await websocket.send_bytes(part.inline_data.data)
@@ -832,8 +861,10 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
 
             try:
                 await websocket.send_json({
-                    "type": "error",
-                    "message": "Voice stream interrupted. Reconnecting...",
+                    "type": "status",
+                    "level": "warning",
+                    "message": "Error 429: Trying to reconnect...",
+                    "countdown": 15
                 })
             except Exception:
                 pass
@@ -858,9 +889,12 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
     if reconnect_count > max_reconnects:
         try:
             await websocket.send_json({
-                "type": "error",
-                "message": "Voice connection lost. Please start a new session.",
+                "type": "status",
+                "level": "error",
+                "message": "Sorry, please start a new session.",
             })
+            # Close connection as requested
+            await websocket.close()
         except Exception:
             pass
 
@@ -894,9 +928,9 @@ async def client_to_agent_messaging(
                         continue
                     state._audio_throttle_timestamps.append(now)
 
-                    logger.debug(f"Audio chunk received (binary): {len(decoded_data)} bytes")
+                    # logger.debug(f"Audio chunk received (binary): {len(decoded_data)} bytes")
                     state.live_request_queue.send_realtime(
-                        Blob(data=decoded_data, mime_type="audio/pcm")
+                        Blob(data=decoded_data, mime_type="audio/l16;rate=16000")
                     )
                 continue
 
@@ -923,6 +957,7 @@ async def client_to_agent_messaging(
                 state.agent_voice = message.get("voice", "Aoede")
                 state.agent_persona = message.get("persona", "Pilot")
                 state.custom_instructions = message.get("custom_instructions", "")
+                state.selected_tabs = message.get("selected_tabs", [])
                 # Initialize ADK with personalization
                 await state.initialize()
                 # Upsert user + create session
@@ -944,7 +979,7 @@ async def client_to_agent_messaging(
                 )
                 try:
                     await websocket.send_json(
-                        {"type": "status", "message": "authenticated"}
+                        {"type": "status", "level": "info", "message": "Ready to go Live!"}
                     )
                 except Exception:
                     pass
@@ -961,7 +996,7 @@ async def client_to_agent_messaging(
                 decoded_data = base64.b64decode(audio_b64)
                 if state.live_request_queue and state.session_active:
                     state.live_request_queue.send_realtime(
-                        Blob(data=decoded_data, mime_type="audio/pcm")
+                        Blob(data=decoded_data, mime_type="audio/l16;rate=16000")
                     )
 
             elif msg_type == "page_context":
@@ -971,6 +1006,7 @@ async def client_to_agent_messaging(
                 state.page_title = message.get("title", "")
                 state.webmcp_available = message.get("webmcp_available", False)
                 state.webmcp_tools = message.get("webmcp_tools", [])
+                state.selected_tabs = message.get("selected_tabs", state.selected_tabs)
                 
                 # Only invalidate screenshot cache if the URL actually changed,
                 # and delay slightly to let the new page begin rendering
@@ -982,13 +1018,19 @@ async def client_to_agent_messaging(
                 logger.info(f"page_context stored: {state.page_url} | {state.page_title}")
 
             elif msg_type == "screenshot_result":
+                success = message.get("success", False)
                 error = message.get("error")
-                if error == "chrome_page":
-                    state.resolve_screenshot("CHROME_INTERNAL_PAGE: Screenshots unavailable here.")
-                elif error == "tab_restricted":
-                    state.resolve_screenshot("TAB_RESTRICTED: This tab is restricted by the user. Screenshots are blocked.")
+                data = message.get("data", "")
+                
+                if not success:
+                    if error in ("chrome_page", "chrome_internal_page"):
+                        state.resolve_screenshot("CHROME_INTERNAL_PAGE: Screenshots unavailable here.", success=False)
+                    elif error == "tab_restricted":
+                        state.resolve_screenshot("TAB_RESTRICTED: This tab is restricted by the user. Screenshots are blocked.", success=False)
+                    else:
+                        state.resolve_screenshot(error or "unknown_error", success=False)
                 else:
-                    state.resolve_screenshot(message.get("data", ""))
+                    state.resolve_screenshot(data, success=True)
 
             elif msg_type == "action_result":
                 state.resolve_action(
@@ -1518,14 +1560,36 @@ async def _run_chat_agent(state: SessionState, user_message: str) -> str:
                 except APIError as api_err:
                     if api_err.status_code == 429 and attempt < max_api_retries - 1:
                         logger.warning(f"Quota exceeded (429), retrying in 5s... (Attempt {attempt+1}/{max_api_retries})")
+                        # Send status update (Prompt 1)
+                        try:
+                            await state.websocket.send_json({
+                                "type": "status",
+                                "level": "warning",
+                                "message": "Rate limit hit",
+                                "retry_attempt": attempt + 1,
+                                "total_attempts": max_api_retries,
+                                "countdown": 5
+                            })
+                        except Exception:
+                            pass
                         await asyncio.sleep(5)
                         continue
                     
                     # Last attempt or different error
+                    if api_err.status_code == 429:
+                         try:
+                            await state.websocket.send_json({
+                                "type": "status",
+                                "level": "error",
+                                "message": "Quota exceeded. Please start a new session."
+                            })
+                         except Exception:
+                             pass
+                    
                     logger.error(f"Chat generation final error: {api_err}")
                     await state.websocket.send_json({
                         "type": "chat_response", 
-                        "text": "⚠️ The AI service is currently experiencing high traffic. Please wait a moment and try again."
+                        "text": "Error 429: Please try again later."
                     })
                     return "AI service busy."
                 except Exception as e:

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 # Retry config for screenshot capture
 _SCREENSHOT_MAX_RETRIES = 3
-_SCREENSHOT_BACKOFF_MS = [100, 200, 400]  # Exponential backoff
+_SCREENSHOT_BACKOFF_MS = [200, 500, 800]  # Increased backoff for better render waiting
 
 
 async def screenshot_tool() -> dict:
@@ -25,12 +25,14 @@ async def screenshot_tool() -> dict:
         if not state:
             return {"success": False, "error": "No active browser session"}
 
-        # Priority 3: Check for restricted URLs (chrome://, about:, etc.)
+        # Priority 3: Check for restricted URLs (chrome://, about:, etc.) and restricted tabs
         restricted_prefixes = ["chrome://", "about:", "chrome-extension://", "edge://"]
         current_url = state.page_url.lower() if state.page_url else ""
+        is_chrome_page = any(current_url.startswith(p) for p in restricted_prefixes) or not current_url
+        is_restricted_tab = any(str(t.get('id')) == str(state.tab_id) for t in state.selected_tabs)
         
-        if any(current_url.startswith(p) for p in restricted_prefixes) or not current_url:
-            logger.info(f"[screenshot] Restricted URL detected ({current_url or 'Empty'}). Returning gray fallback.")
+        if is_chrome_page or is_restricted_tab:
+            logger.info(f"[screenshot] Restricted view detected (chrome={is_chrome_page}, tab={is_restricted_tab}). Returning gray fallback.")
             # 1x1 Gray PNG pixel base64
             gray_pixel_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
             
@@ -46,7 +48,7 @@ async def screenshot_tool() -> dict:
                 "success": True,
                 "page_url": state.page_url or "Restricted",
                 "page_title": state.page_title or "Restricted",
-                "message": "This is a restricted browser page (like a new tab). A placeholder image has been used. Please ask the user to navigate to a public website if you need to see content."
+                "message": "This is a restricted browser page or a restricted tab. A placeholder image has been used. Please ask the user to navigate to a public website if you need to see content."
             }
 
         # Retry screenshot capture with exponential backoff

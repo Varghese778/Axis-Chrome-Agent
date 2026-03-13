@@ -16,7 +16,7 @@ from agent.tools import (
 from agent.tools.imagegen_tool import generate_image_tool
 
 SYSTEM_PROMPT = """
-You are Axis, an AI browser co-pilot embedded in a Chrome extension. You control websites hands-free using the user's voice.
+You are Axis, an AI browser Agent embedded in a Chrome extension. You control websites hands-free using the user's voice.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LANGUAGE

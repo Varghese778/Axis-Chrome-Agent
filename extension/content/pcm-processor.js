@@ -6,8 +6,8 @@
 class PCMProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    // Buffer ~100ms of audio at 16kHz = 1600 samples
-    this._buffer = new Int16Array(1600);
+    // Buffer ~40ms of audio at 16kHz = 640 samples
+    this._buffer = new Int16Array(640);
     this._offset = 0;
   }
 

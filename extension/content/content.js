@@ -333,11 +333,16 @@ async function executeDOMAction(selector, action, value) {
           range.selectNodeContents(el);
           sel.removeAllRanges();
           sel.addRange(range);
-          if (!document.execCommand('insertText', false, textToType)) {
+          
+          if (document.execCommand('insertText', false, textToType)) {
+            // execCommand successfully handled insertion and event dispatching on most sites
+            break;
+          } else {
+            // Fallback for cases where execCommand fails
             el.textContent = textToType;
+            el.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: textToType, bubbles: true, cancelable: true }));
+            el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
           }
-          el.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: textToType, bubbles: true, cancelable: true }));
-          el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
           break;
         }
 
@@ -352,6 +357,7 @@ async function executeDOMAction(selector, action, value) {
         if (el.select) el.select();
         try {
           if (document.execCommand('insertText', false, textToType)) {
+            // Success, most frameworks will react to this automatically
             break;
           }
         } catch (ignore) { /* fall through */ }

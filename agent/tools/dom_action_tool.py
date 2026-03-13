@@ -86,11 +86,15 @@ async def execute_dom_action(
 
         if result.get("success"):
             used_selector = result.get("usedSelector", effective_selector)
+            msg = f"Done — {user_intent}."
+            if action == 'click':
+                msg += " Hint: If this click triggers navigation or a layout change, please take a fresh screenshot or wait 2-3 seconds for the page to settle before your next action."
+            
             action_result = ActionResult(
                 success=True,
                 mode_used="dom",
                 error=None,
-                response_text=f"Done — {user_intent}.",
+                response_text=msg,
             )
             if used_selector != effective_selector:
                 logger.info(f"dom_action: selector fallback used: '{effective_selector}' -> '{used_selector}'")

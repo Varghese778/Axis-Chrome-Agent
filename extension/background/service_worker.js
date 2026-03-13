@@ -69,19 +69,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: 'chrome_page' });
         return;
       }
-      chrome.tabs.captureVisibleTab(
-        tab.windowId,
-        { format: 'jpeg', quality },
-        (dataUrl) => {
-          if (chrome.runtime.lastError) {
-            sendResponse({ success: false, error: chrome.runtime.lastError.message });
-            return;
+      // Use an internal retry loop for captureVisibleTab to handle page transitions
+      let attempts = 0;
+      const MAX_CAPTURE_ATTEMPTS = 3;
+      const RETRY_DELAY = 250;
+
+      const attemptCapture = () => {
+        attempts++;
+        chrome.tabs.captureVisibleTab(
+          tab.windowId,
+          { format: 'jpeg', quality },
+          (dataUrl) => {
+            if (chrome.runtime.lastError || !dataUrl) {
+              const errMsg = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'empty_result';
+              if (attempts < MAX_CAPTURE_ATTEMPTS) {
+                console.warn(`[Axis] Screenshot attempt ${attempts} failed (${errMsg}), retrying in ${RETRY_DELAY}ms...`);
+                setTimeout(attemptCapture, RETRY_DELAY);
+                return;
+              }
+              sendResponse({ success: false, error: errMsg });
+              return;
+            }
+            // Strip data:image/jpeg;base64, prefix
+            const b64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+            sendResponse({ success: true, data: b64 });
           }
-          // Strip data:image/jpeg;base64, prefix
-          const b64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
-          sendResponse({ success: true, data: b64 });
-        }
-      );
+        );
+      };
+
+      attemptCapture();
     });
     return true; // async response
   }
