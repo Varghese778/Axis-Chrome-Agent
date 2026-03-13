@@ -7,12 +7,12 @@ from dotenv import load_dotenv
 load_dotenv()  # Load .env before any ADK/google imports
 
 # Force Vertex AI Auth
-import pathlib
 from backend.config import settings
 os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "1")
 os.environ.setdefault("GOOGLE_CLOUD_PROJECT", settings.google_cloud_project)
 os.environ.setdefault("GOOGLE_CLOUD_LOCATION", settings.google_cloud_location)
-os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", str(pathlib.Path(__file__).parent.parent / "application_default_credentials.json"))
+# GOOGLE_APPLICATION_CREDENTIALS: set via .env for local development;
+# on Cloud Run, ADC is provided by the attached Service Account automatically.
 
 import asyncio
 import base64
@@ -27,15 +27,19 @@ import io
 import csv
 from pypdf import PdfReader
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from google.adk.agents import Agent, LiveRequestQueue
 from google.adk.agents.run_config import RunConfig
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 from google.genai.types import Blob
 import google.genai as genai
+from google.genai.errors import APIError
 
 from agent.Axis_agent import SYSTEM_PROMPT, root_agent
 from backend.firestore_client import firestore_client
@@ -157,6 +161,59 @@ async def _generate_session_headline(transcript: list) -> str:
         return "Browser session"
 
 
+def _prune_context(history: list, max_turns: int = 20):
+    """
+    Rolling context window:
+    1. Only keep the VERY LAST image (Blob) in history.
+    2. Replace older Blobs with text: [Previous screenshot omitted to save memory].
+    3. Trim history to last N turns.
+    """
+    if not history:
+        return
+
+    # 1. Prune Images: iterate backwards, keep first image found, strip others
+    image_found = False
+    for i in range(len(history) - 1, -1, -1):
+        content = history[i]
+        # Content might be types.Content or a dict depending on ADK version
+        parts = getattr(content, 'parts', None)
+        if parts is None and isinstance(content, dict):
+            parts = content.get('parts', [])
+        
+        if not parts:
+            continue
+            
+        new_parts = []
+        for part in parts:
+            # Check for image blob in various formats
+            is_image = False
+            if hasattr(part, 'inline_data') and part.inline_data: is_image = True
+            elif hasattr(part, 'data') and part.data: is_image = True
+            elif isinstance(part, dict) and (part.get('inline_data') or part.get('data')): is_image = True
+            
+            if is_image:
+                if not image_found:
+                    new_parts.append(part)
+                    image_found = True
+                else:
+                    # Replace with text part
+                    from google.genai import types
+                    new_parts.append(types.Part.from_text(text="[Previous screenshot omitted to save memory]"))
+            else:
+                new_parts.append(part)
+        
+        if hasattr(content, 'parts'):
+            content.parts = new_parts
+        elif isinstance(content, dict):
+            content['parts'] = new_parts
+
+    # 2. Trim Turns
+    if len(history) > max_turns:
+        history[:] = history[-max_turns:]
+        logger.info(f"Pruned history to {len(history)} turns")
+
+
+
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
@@ -175,8 +232,9 @@ class SessionState:
 
         # Agent customization
         self.agent_voice: str = "Aoede"
-        self.agent_persona: str = "Pilot"
+        self.agent_persona: str = "Axis"  # Renamed from Pilot
         self.custom_instructions: str = ""
+        self.chat_history: list[types.Content] = []  # Added for context management
 
         # Page context
         self.page_url: str = ""
@@ -206,6 +264,10 @@ class SessionState:
         self.live_request_queue: Optional[LiveRequestQueue] = None
         self.live_events = None
         self.initialized_event = asyncio.Event()
+        
+        # Throttling
+        self._chat_throttle_timestamps: list[float] = []
+        self._audio_throttle_timestamps: list[float] = []
 
     async def initialize(self):
         """Create per-session agent with persona, then start bidi live stream."""
@@ -242,43 +304,51 @@ class SessionState:
             agent=session_agent,
         )
 
-        self.adk_session = await self.runner.session_service.create_session(
-            app_name="axis",
-            user_id=self.user_id or "anonymous",
-        )
+        try:
+            self.adk_session = await self.runner.session_service.create_session(
+                app_name="axis",
+                user_id=self.user_id or "anonymous",
+            )
 
-        self.live_request_queue = LiveRequestQueue()
+            self.live_request_queue = LiveRequestQueue()
 
-        run_config = RunConfig(
-            streaming_mode="bidi",
-            realtime_input_config=types.RealtimeInputConfig(
-                automatic_activity_detection=types.AutomaticActivityDetection(
-                    start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
-                    end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
-                    prefix_padding_ms=0,
-                    silence_duration_ms=0,
-                )
-            ),
-            response_modalities=[types.Modality.AUDIO],
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name=self.agent_voice
+            run_config = RunConfig(
+                streaming_mode="bidi",
+                realtime_input_config=types.RealtimeInputConfig(
+                    automatic_activity_detection=types.AutomaticActivityDetection(
+                        start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
+                        end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
+                        prefix_padding_ms=0,
+                        silence_duration_ms=0,
                     )
                 ),
-                language_code="en-US",
-            ),
-            output_audio_transcription={},
-            input_audio_transcription={},
-        )
+                response_modalities=[types.Modality.AUDIO],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name=self.agent_voice
+                        )
+                    ),
+                    language_code="en-US",
+                ),
+                output_audio_transcription={},
+                input_audio_transcription={},
+            )
 
-        self.live_events = self.runner.run_live(
-            session=self.adk_session,
-            live_request_queue=self.live_request_queue,
-            run_config=run_config,
-        )
-
-        self.initialized_event.set()
+            self.live_events = self.runner.run_live(
+                session=self.adk_session,
+                live_request_queue=self.live_request_queue,
+                run_config=run_config,
+            )
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                logger.error(f"Quota error during live init: {error_str}")
+                # We'll let the event set so the messaging loop can handle it or the error is logged.
+                # But actually, if this fails, we should probably set a flag or just let it be.
+            raise e
+        finally:
+            self.initialized_event.set()
 
     # -- screenshot future pattern ------------------------------------------
 
@@ -536,6 +606,16 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
             async for event in state.live_events:
                 if not state.session_active:
                     break
+                
+                # Context Management: Prune history after every turn
+                if getattr(event, 'turn_complete', False):
+                    # Check common history attributes
+                    for attr_name in ('history', 'messages', 'events'):
+                        hist = getattr(state.adk_session, attr_name, None)
+                        if hist is not None and isinstance(hist, list):
+                            _prune_context(hist, max_turns=20)
+                            break
+
                 if getattr(event, 'turn_complete', False) or getattr(event, 'interrupted', False):
                     try:
                         await websocket.send_json({
@@ -736,6 +816,20 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
             logger.warning(
                 f"ADK live stream error (attempt {reconnect_count}/{max_reconnects}): {error_str}"
             )
+            
+            # Priority: Graceful Live Failure (429 Quota)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                logger.error(f"Vertex AI Quota exceeded for live session {state.session_id}")
+                try:
+                    await websocket.send_json({
+                        "type": "status",
+                        "message": "Service Busy",
+                        "detail": "high_traffic"
+                    })
+                except Exception:
+                    pass
+                break # Don't retry if it's a quota error to avoid worsening the situation
+
             try:
                 await websocket.send_json({
                     "type": "error",
@@ -792,6 +886,14 @@ async def client_to_agent_messaging(
             if "bytes" in message:
                 decoded_data = message["bytes"]
                 if state.live_request_queue and state.session_active:
+                    # High-ceiling audio throttle: max 200 chunks per second
+                    now = datetime.now(timezone.utc).timestamp()
+                    state._audio_throttle_timestamps = [t for t in state._audio_throttle_timestamps if t > now - 1.0]
+                    if len(state._audio_throttle_timestamps) > 200:
+                        logger.warning(f"Audio throttle active (200/sec) for session={state.session_id}")
+                        continue
+                    state._audio_throttle_timestamps.append(now)
+
                     logger.debug(f"Audio chunk received (binary): {len(decoded_data)} bytes")
                     state.live_request_queue.send_realtime(
                         Blob(data=decoded_data, mime_type="audio/pcm")
@@ -1019,6 +1121,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Axis", lifespan=lifespan)
 
+# --- Rate Limiter (slowapi) ---
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1026,6 +1133,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- WebSocket concurrency limits ---
+_MAX_LIVE_WS_CONNECTIONS = 50
+_MAX_CHAT_WS_CONNECTIONS = 50
+_active_live_ws = 0
+_active_chat_ws = 0
+_ws_lock = asyncio.Lock()
 
 
 @app.get("/health")
@@ -1073,9 +1187,10 @@ _feedback_timestamps: dict[str, list[float]] = {}
 
 
 @app.post("/feedback")
-async def submit_feedback(request: FeedbackRequest):
+@limiter.limit("5/minute")
+async def submit_feedback(payload: FeedbackRequest, request: Request):
     """Send feedback email. Rate limited: max 5 per email per hour."""
-    email = request.user_email
+    email = payload.user_email
     now = datetime.now(timezone.utc).timestamp()
 
     # Rate limit per email
@@ -1092,11 +1207,11 @@ async def submit_feedback(request: FeedbackRequest):
         _feedback_timestamps[email] = timestamps
 
     success = await send_feedback_email(
-        feedback_type=request.feedback_type,
-        subject=request.subject,
-        message=request.message,
-        sender_name=request.sender_name,
-        user_email=request.user_email,
+        feedback_type=payload.feedback_type,
+        subject=payload.subject,
+        message=payload.message,
+        sender_name=payload.sender_name,
+        user_email=payload.user_email,
     )
 
     if success:
@@ -1113,19 +1228,20 @@ class ImageGenRequest(BaseModel):
     session_id: str = ""
 
 @app.post("/generate-image")
-async def generate_image_endpoint(request: ImageGenRequest):
+@limiter.limit("10/minute")
+async def generate_image_endpoint(payload: ImageGenRequest, request: Request):
     """
     Generate an image using Gemini 2.5 Flash Image.
     Returns base64 encoded image and associated metadata.
     """
-    if not request.prompt:
+    if not payload.prompt:
         raise HTTPException(status_code=400, detail="Prompt is missing")
 
-    logger.info(f"Generating image for session={request.session_id} | Prompt: {request.prompt[:60]}...")
+    logger.info(f"Generating image for session={payload.session_id} | Prompt: {payload.prompt[:60]}...")
     
     # Broadcast tool_start via WebSocket so UI can show the generating bubble immediately
-    if request.session_id:
-        state = session_manager.get(request.session_id)
+    if payload.session_id:
+        state = session_manager.get(payload.session_id)
         if state and state.websocket and state.session_active:
             try:
                 await state.websocket.send_json({"type": "tool_start", "tool": "generate_image"})
@@ -1135,7 +1251,7 @@ async def generate_image_endpoint(request: ImageGenRequest):
     def _call_genai():
         return vertex_client.models.generate_content(
             model="gemini-2.5-flash-image",
-            contents=request.prompt,
+            contents=payload.prompt,
             config=types.GenerateContentConfig(
                 response_modalities=[types.Modality.TEXT, types.Modality.IMAGE],
                 image_config=types.ImageConfig(
@@ -1169,7 +1285,7 @@ async def generate_image_endpoint(request: ImageGenRequest):
             "image_b64": image_b64,
             "mime_type": "image/png",
             "caption": caption,
-            "prompt": request.prompt
+            "prompt": payload.prompt
         }
 
     except Exception as e:
@@ -1193,7 +1309,8 @@ class ChatSessionRequest(BaseModel):
 
 
 @app.post("/chat-sessions")
-async def create_chat_session(req: ChatSessionRequest):
+@limiter.limit("10/minute")
+async def create_chat_session(req: ChatSessionRequest, request: Request):
     """Create a Firestore session doc for a text chat."""
     await firestore_client.create_session(
         user_id=req.user_id,
@@ -1380,17 +1497,42 @@ async def _run_chat_agent(state: SessionState, user_message: str) -> str:
         user_parts.append(types.Part.from_text(text=user_message))
         state.chat_history.append(types.Content(role="user", parts=user_parts))
 
-        for _ in range(10):  # max tool rounds
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=state.chat_history,
-                config=types.GenerateContentConfig(
-                    system_instruction=CHAT_SYSTEM_PROMPT,
-                    tools=[CHAT_TOOL_DECLARATIONS],
-                ),
-            )
+        # Context Management: Prune before generating
+        _prune_context(state.chat_history, max_turns=20)
 
-            if not response.candidates:
+        for _ in range(10):  # max tool rounds
+            # Implement retry for chat generation (Prompt 3)
+            response = None
+            max_api_retries = 3
+            for attempt in range(max_api_retries):
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=state.chat_history,
+                        config=types.GenerateContentConfig(
+                            system_instruction=CHAT_SYSTEM_PROMPT,
+                            tools=[CHAT_TOOL_DECLARATIONS],
+                        ),
+                    )
+                    break # Success
+                except APIError as api_err:
+                    if api_err.status_code == 429 and attempt < max_api_retries - 1:
+                        logger.warning(f"Quota exceeded (429), retrying in 5s... (Attempt {attempt+1}/{max_api_retries})")
+                        await asyncio.sleep(5)
+                        continue
+                    
+                    # Last attempt or different error
+                    logger.error(f"Chat generation final error: {api_err}")
+                    await state.websocket.send_json({
+                        "type": "chat_response", 
+                        "text": "⚠️ The AI service is currently experiencing high traffic. Please wait a moment and try again."
+                    })
+                    return "AI service busy."
+                except Exception as e:
+                    logger.error(f"Unexpected chat generation error: {e}")
+                    raise e
+
+            if not response or not response.candidates:
                 return "Sorry, I couldn't generate a response."
 
             model_content = response.candidates[0].content
@@ -1503,6 +1645,20 @@ async def _chat_ws_reader(websocket: WebSocket, state: SessionState):
                 pass
 
         elif msg_type == "chat_message":
+            # Chat throttle: 60 messages per minute (1 per second)
+            now = datetime.now(timezone.utc).timestamp()
+            state._chat_throttle_timestamps = [t for t in state._chat_throttle_timestamps if t > now - 60.0]
+            if len(state._chat_throttle_timestamps) >= 60:
+                logger.warning(f"Chat message throttled (60/min) for session={state.session_id}")
+                try:
+                    await websocket.send_json({
+                        "type": "chat_response", 
+                        "text": "Slow down! You're sending messages too fast (limit: 60/min)."
+                    })
+                except Exception:
+                    pass
+                continue
+            state._chat_throttle_timestamps.append(now)
             await state._chat_message_queue.put(data.get("text", ""))
 
         elif msg_type == "screenshot_result":
@@ -1605,9 +1761,23 @@ async def _chat_message_processor(websocket: WebSocket, state: SessionState):
 @app.websocket("/ws-chat/{session_id}")
 async def ws_chat_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for text chat with full tool access."""
+    global _active_chat_ws
+    async with _ws_lock:
+        if _active_chat_ws >= _MAX_CHAT_WS_CONNECTIONS:
+            await websocket.close(code=1013, reason="Server busy — too many chat connections")
+            logger.warning(f"Chat WS rejected (concurrency limit): {session_id}")
+            return
+        _active_chat_ws += 1
+    try:
+        await _ws_chat_endpoint_inner(websocket, session_id)
+    finally:
+        async with _ws_lock:
+            _active_chat_ws -= 1
+
+
+async def _ws_chat_endpoint_inner(websocket: WebSocket, session_id: str):
     await websocket.accept()
     state = session_manager.create(session_id, websocket)
-    state.chat_history = []
     state._chat_message_queue = asyncio.Queue()
 
     logger.info(f"Chat WebSocket connected: {session_id}")
@@ -1657,6 +1827,21 @@ async def ws_chat_endpoint(websocket: WebSocket, session_id: str):
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    global _active_live_ws
+    async with _ws_lock:
+        if _active_live_ws >= _MAX_LIVE_WS_CONNECTIONS:
+            await websocket.close(code=1013, reason="Server busy — too many live connections")
+            logger.warning(f"Live WS rejected (concurrency limit): {session_id}")
+            return
+        _active_live_ws += 1
+    try:
+        await _ws_live_endpoint_inner(websocket, session_id)
+    finally:
+        async with _ws_lock:
+            _active_live_ws -= 1
+
+
+async def _ws_live_endpoint_inner(websocket: WebSocket, session_id: str):
     await websocket.accept()
     state = session_manager.create(session_id, websocket)
     # Don't initialize yet — wait for auth message with voice/persona settings

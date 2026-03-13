@@ -55,7 +55,7 @@ async def execute_webmcp_tool(
         logger.info(
             "webmcp_executed",
             extra={
-                "session_id": session_id,
+                "session_id": state.session_id,
                 "tool": tool_name,
                 "success": action_result.success,
             },
