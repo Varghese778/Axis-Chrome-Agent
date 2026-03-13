@@ -103,6 +103,12 @@ const liveCanvas = document.getElementById('live-visualizer');
 const chatContainer = document.getElementById('chat-container');
 const recentSessionsDiv = document.getElementById('recent-sessions');
 
+// Image Modal References
+const imageModal = document.getElementById('image-modal');
+const modalImage = document.getElementById('modal-image');
+const modalDownloadBtn = document.getElementById('modal-download-btn');
+const modalCloseBtn = document.getElementById('modal-close-btn');
+
 // ---------------------------------------------------------------------------
 // Screen & View management
 // ---------------------------------------------------------------------------
@@ -425,6 +431,17 @@ function handleMessage(msg, sock) {
   } else if (msg.type === 'agent_transcript' || msg.type === 'output_transcription') {
     if (msg.text) {
       showTranscript(msg.text, 'agent', !msg.is_partial);
+      
+      // TRIGGER: If agent says they will generate/draw, show a simple text bubble immediately
+      const lower = msg.text.toLowerCase();
+      const keywords = ['generating', 'drawing', 'creating', 'painting', 'rendering', 'sketching', 'generated', 'visualizing'];
+      const hasKeywords = keywords.some(k => lower.includes(k));
+
+      if (hasKeywords) {
+          if (!document.querySelector('.generating-bubble') && !document.querySelector('.image-message-card')) {
+              showGeneratingBubble();
+          }
+      }
     }
   } else if (msg.type === 'session_ended') {
     // Server confirmed session end
@@ -511,6 +528,17 @@ function handleMessage(msg, sock) {
     });
   } else if (msg.type === 'file_uploaded') {
     showToast(`\u2713 ${msg.filename} shared with Axis`);
+  } else if (msg.type === 'tool_result' && msg.tool === 'generate_image') {
+    const generatingBubble = document.querySelector('.generating-bubble');
+    if (generatingBubble) {
+      resolveImageMessage(generatingBubble, msg.data);
+    } else {
+      // If result came before bubble was triggered (race condition)
+      const container = currentView === 'chat' ? chatMessagesEl : chatContainer;
+      const ghost = document.createElement('div');
+      container.appendChild(ghost);
+      resolveImageMessage(ghost, msg.data);
+    }
   }
 }
 
@@ -708,6 +736,40 @@ themeToggle.addEventListener('change', () => {
   document.body.classList.toggle('theme-light', themeToggle.checked);
 });
 
+// Image Modal Listeners
+if (imageModal) {
+    modalCloseBtn.onclick = closeModal;
+    imageModal.onclick = (e) => {
+        if (e.target === imageModal) closeModal();
+    };
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && imageModal.classList.contains('visible')) {
+            closeModal();
+        }
+    });
+}
+
+function openModal(src) {
+    if (!imageModal || !modalImage) return;
+    modalImage.src = src;
+    imageModal.classList.add('visible');
+    
+    // Set up modal download
+    modalDownloadBtn.onclick = () => downloadImage(src);
+}
+
+function closeModal() {
+    if (imageModal) imageModal.classList.remove('visible');
+}
+
+function downloadImage(dataUrl) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `axis-vision-${timestamp}.png`;
+    link.click();
+}
+
 // ---------------------------------------------------------------------------
 // Mic — captures directly in sidepanel (extension origin, single permission)
 // ---------------------------------------------------------------------------
@@ -861,32 +923,39 @@ let lastBubbleEl = null;
 function showTranscript(text, role, isFinal) {
   if (!chatContainer) return;
 
-  // If partial and same role as last bubble, update in place
-  if (!isFinal && lastBubbleEl && lastBubbleRole === role) {
-    lastBubbleEl.textContent = text;
-    lastBubbleEl.classList.add('partial');
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    return;
+  // If partial: append delta to active bubble for same role
+  if (!isFinal) {
+    if (lastBubbleEl && lastBubbleRole === role && lastBubbleEl.classList.contains('partial')) {
+      // Manage spacing between word chunks
+      const current = lastBubbleEl.textContent;
+      const separator = (current && !current.endsWith(' ') && !text.startsWith(' ')) ? ' ' : '';
+      lastBubbleEl.textContent += separator + text;
+    } else {
+      // Create a new partial bubble
+      const bubble = document.createElement('div');
+      bubble.className = `chat-bubble ${role} partial`;
+      bubble.textContent = text;
+      chatContainer.appendChild(bubble);
+      lastBubbleEl = bubble;
+      lastBubbleRole = role;
+    }
+  } 
+  // If final: overwrite active partial bubble with cumulative string, then seal
+  else {
+    if (lastBubbleEl && lastBubbleRole === role && lastBubbleEl.classList.contains('partial')) {
+      lastBubbleEl.textContent = text;
+      lastBubbleEl.classList.remove('partial');
+    } else {
+      // Create a new final bubble if no active partial existed
+      const bubble = document.createElement('div');
+      bubble.className = `chat-bubble ${role}`;
+      bubble.textContent = text;
+      chatContainer.appendChild(bubble);
+    }
+    // Seal bubble (next transcript creates a new one)
+    lastBubbleRole = null;
+    lastBubbleEl = null;
   }
-
-  // If finalizing a partial from the same role, update the existing bubble
-  if (isFinal && lastBubbleEl && lastBubbleRole === role && lastBubbleEl.classList.contains('partial')) {
-    lastBubbleEl.textContent = text;
-    lastBubbleEl.classList.remove('partial');
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    // Reset so next message creates a new bubble
-    lastBubbleRole = role;
-    return;
-  }
-
-  // Create a new bubble
-  const bubble = document.createElement('div');
-  bubble.className = `chat-bubble ${role}${isFinal ? '' : ' partial'}`;
-  bubble.textContent = text;
-  chatContainer.appendChild(bubble);
-
-  lastBubbleRole = role;
-  lastBubbleEl = bubble;
 
   // Scroll to bottom
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1463,4 +1532,81 @@ if (saveInstructionsBtn) {
     chrome.storage.sync.set({ axis_custom_instructions: savedCustomInstructions });
     showSaveConfirm();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Image Generation DOM Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Shows a simple text bubble indicating image generation is in progress.
+ */
+function showGeneratingBubble() {
+    const container = currentView === 'chat' ? chatMessagesEl : chatContainer;
+    if (!container) return null;
+
+    // Dupe check
+    if (document.querySelector('.generating-bubble')) return null;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble agent generating-bubble';
+    bubble.textContent = 'Generating, please wait...';
+    
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+    return bubble;
+}
+
+/**
+ * Replaces a generating bubble or ghost element with the actual generated image card.
+ */
+function resolveImageMessage(anchorEl, data) {
+    if (!anchorEl) return;
+    
+    const card = document.createElement('div');
+    card.className = 'image-message-card';
+    
+    const imgSrc = `data:${data.mime_type || 'image/png'};base64,${data.image_b64}`;
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    img.alt = data.caption || 'Generated image';
+    
+    // Open modal on click
+    card.onclick = () => openModal(imgSrc);
+    
+    const footer = document.createElement('div');
+    footer.className = 'image-card-footer';
+    
+    if (data.caption) {
+        const caption = document.createElement('div');
+        caption.className = 'image-caption';
+        caption.textContent = data.caption;
+        footer.appendChild(caption);
+    }
+    
+    if (data.prompt) {
+        const prompt = document.createElement('div');
+        prompt.className = 'image-prompt';
+        prompt.textContent = `Prompt: ${data.prompt}`;
+        footer.appendChild(prompt);
+    }
+    
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'image-download-btn';
+    downloadBtn.textContent = 'Download';
+    downloadBtn.onclick = (e) => {
+        e.stopPropagation(); // Don't open modal
+        downloadImage(imgSrc);
+    };
+    footer.appendChild(downloadBtn);
+    
+    card.appendChild(img);
+    card.appendChild(footer);
+    
+    // Replace anchor with card
+    anchorEl.replaceWith(card);
+    
+    // Scroll to bottom
+    const container = currentView === 'chat' ? chatMessagesEl : chatContainer;
+    if (container) container.scrollTop = container.scrollHeight;
 }

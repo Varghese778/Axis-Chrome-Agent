@@ -25,6 +25,30 @@ async def screenshot_tool() -> dict:
         if not state:
             return {"success": False, "error": "No active browser session"}
 
+        # Priority 3: Check for restricted URLs (chrome://, about:, etc.)
+        restricted_prefixes = ["chrome://", "about:", "chrome-extension://", "edge://"]
+        current_url = state.page_url.lower() if state.page_url else ""
+        
+        if any(current_url.startswith(p) for p in restricted_prefixes) or not current_url:
+            logger.info(f"[screenshot] Restricted URL detected ({current_url or 'Empty'}). Returning gray fallback.")
+            # 1x1 Gray PNG pixel base64
+            gray_pixel_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+            
+            # Inject fallback into live stream
+            from google.genai.types import Blob
+            if state.live_request_queue:
+                image_bytes = base64.b64decode(gray_pixel_b64)
+                state.live_request_queue.send_realtime(
+                    Blob(data=image_bytes, mime_type="image/png")
+                )
+            
+            return {
+                "success": True,
+                "page_url": state.page_url or "Restricted",
+                "page_title": state.page_title or "Restricted",
+                "message": "This is a restricted browser page (like a new tab). A placeholder image has been used. Please ask the user to navigate to a public website if you need to see content."
+            }
+
         # Retry screenshot capture with exponential backoff
         jpeg_b64 = None
         last_error = "Screenshot capture timed out"

@@ -13,6 +13,7 @@ from agent.tools import (
     browser_action,
     plan_and_execute,
 )
+from agent.tools.imagegen_tool import generate_image_tool
 
 SYSTEM_PROMPT = """
 You are Axis, an AI browser co-pilot embedded in a Chrome extension. You control websites hands-free using the user's voice.
@@ -61,6 +62,8 @@ For buttons/links with visible text use:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TOOLS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+generate_image(prompt): Generates an image from a text description. Use when the user says draw, generate, create an image of, show me a picture of, or visualise. Briefly confirm what you are generating before calling the tool. CRITICAL: If the user asks to generate an image based on their current screen or page, you MUST first call screenshot_tool to analyze their screen context, then write a comprehensive text description of what you saw, and pass that highly detailed description into generate_image(prompt).
+
 screenshot_tool()
   → Take a screenshot before any click, type, or page question.
   → If it returns CHROME_INTERNAL_PAGE, tell the user to navigate to a website.
@@ -135,5 +138,6 @@ root_agent = Agent(
         browser_action,
         log_session_event,
         plan_and_execute,
+        generate_image_tool,
     ],
 )

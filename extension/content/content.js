@@ -159,6 +159,26 @@ function findElement(selector) {
   return null;
 }
 
+/**
+ * Robustly escapes CSS selectors to handle special characters in utility classes (e.g., '/', ':').
+ */
+function sanitizeSelector(selector) {
+  if (!selector) return '';
+  // If it's a simple tag selector or already escaped, skip
+  if (/^[a-zA-Z0-9-]+$/.test(selector)) return selector;
+  
+  try {
+    // Only escape forward slashes logic. 
+    // Brackets, dots, and colons are standard CSS syntax if constructured by the agent.
+    // However, identifier-internal colons (Tailwind sm:p-4) would need escaping.
+    // For now, removing the categorical escaping of [], ., and : fixes the reported 
+    // bug where 'button[aria-label="Pause"]' becomes 'button\[aria-label="Pause"\]'.
+    return selector.replace(/([/])/g, '\\$1');
+  } catch (e) {
+    return selector;
+  }
+}
+
 function findElementWithFallback(selector) {
   // Try the given selector first (including iframes)
   let el = findElement(selector);
@@ -255,12 +275,15 @@ async function executeDOMAction(selector, action, value) {
       return { success: true, scrollY: Math.round(window.scrollY), scrollHeight: document.body.scrollHeight };
     }
 
+    // Sanitize selector before query (Priority 2)
+    const sanitizedSelector = sanitizeSelector(selector);
+
     // Use smart fallback for type/click actions on potential text inputs
     const el = (action === 'type' || action === 'click')
-      ? findElementWithFallback(selector)
-      : findElement(selector);
+      ? findElementWithFallback(sanitizedSelector)
+      : findElement(sanitizedSelector);
     if (!el) {
-      return { success: false, error: 'Element not found: ' + selector };
+      return { success: false, error: 'Element not found: ' + (sanitizedSelector || selector) };
     }
 
     switch (action) {
@@ -270,7 +293,27 @@ async function executeDOMAction(selector, action, value) {
         if (!isVisible) {
           return { success: false, error: 'Element found but not visible: ' + selector };
         }
-        el.click();
+        
+        try {
+          // Priority 2: el.click is not a function fallback
+          if (typeof el.click === 'function') {
+            el.click();
+          } else {
+            throw new Error('el.click is not a function');
+          }
+        } catch (e) {
+          console.warn('[Axis] click() failed, falling back to MouseEvents:', e);
+          const rect = el.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          
+          const opts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y };
+          el.dispatchEvent(new PointerEvent('pointerdown', opts));
+          el.dispatchEvent(new MouseEvent('mousedown', opts));
+          el.dispatchEvent(new PointerEvent('pointerup', opts));
+          el.dispatchEvent(new MouseEvent('mouseup', opts));
+          el.dispatchEvent(new MouseEvent('click', opts));
+        }
         break;
       }
       case 'type': {
