@@ -133,9 +133,10 @@ body.theme-light .home-description{color:#666}
 
 .user-avatar{
   width:34px;height:34px;border-radius:50%;
-  background:linear-gradient(135deg,#4fc3f7,#0288d1);
+  background:rgba(255,255,255,.05);
+  border:1.5px solid rgba(255,255,255,.1);
   display:flex;align-items:center;justify-content:center;
-  font-size:14px;font-weight:600;color:#0d1117;
+  font-size:14px;font-weight:600;color:#4fc3f7;
 }
 
 .btn-icon-sm{
@@ -149,16 +150,16 @@ body.theme-light .home-description{color:#666}
 
 /* Greeting */
 .idle-greeting-section{padding:8px 20px 0;text-align:left}
-.idle-greeting{font-size:18px;font-weight:600;color:#94a3b8}
+.idle-greeting{font-size:18px;font-weight:600;color:#f8fafc}
 .idle-greeting-sub{font-size:14px;color:#6b7280;margin-top:4px}
 
 /* AXIS Hero */
-.idle-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.idle-hero-title{font-size:36px;font-weight:800;color:#f8fafc;letter-spacing:4px;text-transform:uppercase}
+.idle-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+.idle-hero-title{font-size:36px;font-weight:800;color:#f8fafc;letter-spacing:4px;text-transform:uppercase;z-index:1}
 .idle-hero-tagline{font-size:14px;color:#6b7280;margin-top:6px}
 
 /* Idle bottom section pinned */
-.idle-bottom{flex-shrink:0;padding:0 0 20px}
+.idle-bottom{flex-shrink:0;padding:0 0 20px;margin-top:12px}
 
 /* Tab Selector */
 .tab-selector{position:relative;display:flex;align-items:center;gap:8px;padding:8px 16px;flex-wrap:wrap}
@@ -216,11 +217,11 @@ body.theme-light .home-description{color:#666}
 
 /* Input Box with embedded GO LIVE */
 .idle-input-box{
-  display:flex;align-items:center;gap:8px;margin:8px 20px 0;
-  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;gap:8px;margin:28px 20px 0;
+  background:rgba(255,255,255,.05);border:1px solid #6b7280;
   border-radius:14px;padding:6px 6px 6px 16px;transition:border-color 200ms;
 }
-.idle-input-box:focus-within{border-color:rgba(79,195,247,.5)}
+.idle-input-box:focus-within{border-color:#4fc3f7}
 .idle-text-input{
   flex:1;background:none;border:none;outline:none;
   color:#f8fafc;font-size:13px;font-family:inherit;
@@ -595,12 +596,19 @@ body.theme-light .chat-bubble.user{
 .about-title{font-size:28px;font-weight:700;color:#e0e0e0;margin-bottom:4px}
 .about-version{font-size:12px;color:#6b7280;margin-bottom:8px}
 .about-tagline{font-size:15px;color:#4fc3f7;font-weight:500}
-.about-description{font-size:13px;color:#94a3b8;line-height:1.6;margin:16px 0 20px;text-align:center}
+.about-description{font-size:13px;color:#94a3b8;line-height:1.6;margin:16px 0 20px;text-align:justify}
 .about-section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin:16px 0 8px}
 .about-steps{padding-left:20px;margin:0 0 16px;font-size:13px;color:#e0e0e0;line-height:1.8}
 .about-steps strong{color:#4fc3f7}
 .about-powered{padding-left:20px;margin:0 0 16px;font-size:13px;color:#e0e0e0;line-height:1.8;list-style:disc}
-.about-built-for{font-size:12px;color:#6b7280;text-align:center;margin:20px 0 16px;font-style:italic}
+.about-built-for{font-size:12px;color:#6b7280;text-align:center;margin:20px 0 4px;font-style:italic}
+.about-developer{
+  font-size:14px;color:#94a3b8;text-align:center;
+  padding:20px 0;margin:0 20px;
+  font-style:italic;font-family:'Garamond', serif;
+  border-top:1px solid rgba(255,255,255,0.05);
+  flex-shrink:0;
+}
 .about-back-bottom{margin-top:8px}
 
 /* Feedback page */
@@ -708,7 +716,7 @@ body.theme-light .settings-textarea{background:#dde3eb;border-color:#bbb;color:#
 .chat-messages .chat-bubble.partial{opacity:.7}
 .chat-input-bar{
   display:flex;align-items:center;gap:8px;padding:10px 16px;
-  border-top:1px solid rgba(255,255,255,.06);flex-shrink:0;
+  border:1px solid #6b7280;border-radius:14px;margin:10px 16px;flex-shrink:0;
 }
 .chat-input-bar .idle-text-input{flex:1}
 body.theme-light .view-chat{background:#f0f4f8}
