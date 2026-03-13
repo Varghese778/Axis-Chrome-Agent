@@ -528,6 +528,12 @@ function handleMessage(msg, sock) {
     });
   } else if (msg.type === 'file_uploaded') {
     showToast(`\u2713 ${msg.filename} shared with Axis`);
+  } else if (msg.type === 'tool_start' && msg.tool === 'generate_image') {
+    const isImageCardReady = document.querySelector('.image-message-card');
+    const isBubbleActive = document.querySelector('.generating-bubble');
+    if (!isBubbleActive && !isImageCardReady) {
+      showGeneratingBubble();
+    }
   } else if (msg.type === 'tool_result' && msg.tool === 'generate_image') {
     const generatingBubble = document.querySelector('.generating-bubble');
     if (generatingBubble) {

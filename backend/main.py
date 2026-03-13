@@ -683,6 +683,14 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
                             logger.debug(f"noise_filter: suppressing model content (trigger='{state._last_input_text}')")
                             continue
                         for part in event.content.parts:
+                            if getattr(part, 'function_call', None):
+                                if part.function_call.name == "generate_image":
+                                    logger.info(f"Model function call detected: {part.function_call.name}. Broadcasting tool_start via WS.")
+                                    try:
+                                        await websocket.send_json({"type": "tool_start", "tool": "generate_image"})
+                                    except Exception as e:
+                                        logger.error(f"Failed to send tool_start: {e}")
+
                             if (
                                 getattr(part, 'inline_data', None)
                                 and part.inline_data.mime_type.startswith("audio/pcm")
@@ -1114,6 +1122,15 @@ async def generate_image_endpoint(request: ImageGenRequest):
         raise HTTPException(status_code=400, detail="Prompt is missing")
 
     logger.info(f"Generating image for session={request.session_id} | Prompt: {request.prompt[:60]}...")
+    
+    # Broadcast tool_start via WebSocket so UI can show the generating bubble immediately
+    if request.session_id:
+        state = session_manager.get(request.session_id)
+        if state and state.websocket and state.session_active:
+            try:
+                await state.websocket.send_json({"type": "tool_start", "tool": "generate_image"})
+            except Exception as e:
+                logger.debug(f"Failed to send tool_start via WS: {e}")
 
     def _call_genai():
         return vertex_client.models.generate_content(
