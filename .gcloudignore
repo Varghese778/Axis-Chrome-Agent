@@ -1,0 +1,12 @@
+.gcloudignore
+.git
+.gitignore
+venv/
+.env
+application_default_credentials.json
+logs/
+extension.crx
+extension.pem
+__pycache__/
+*.pyc
+.env.example

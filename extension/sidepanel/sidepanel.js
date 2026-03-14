@@ -1,9 +1,14 @@
 // sidepanel/sidepanel.js — Axis
 // Manages UI state, Google Auth, audio playback, visualizer, ephemeral transcripts.
 
-const BACKEND_WS = 'ws://localhost:8080/ws/';
-const BACKEND_WS_CHAT = 'ws://localhost:8080/ws-chat/';
-const BACKEND_HTTP = 'http://localhost:8080';
+// --- ENVIRONMENT CONFIGURATION ---
+const IS_PROD = true; // Set to true for production
+const PROD_DOMAIN = "axis-backend-461115625041.us-central1.run.app"; // We will paste the URL here later
+
+const BACKEND_WS = IS_PROD ? `wss://${PROD_DOMAIN}/ws/` : 'ws://localhost:8080/ws/';
+const BACKEND_WS_CHAT = IS_PROD ? `wss://${PROD_DOMAIN}/ws-chat/` : 'ws://localhost:8080/ws-chat/';
+const BACKEND_HTTP = IS_PROD ? `https://${PROD_DOMAIN}` : 'http://localhost:8080';
+// ---------------------------------
 let SESSION_ID = crypto.randomUUID();
 
 const GOOGLE_CLIENT_ID = '461115625041-lp7uhcsip7r1uk6bv70rtqap60nkd4mb.apps.googleusercontent.com';

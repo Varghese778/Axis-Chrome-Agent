@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # Server
     host: str = "0.0.0.0"
     port: int = 8080
-    environment: str = "development"
+    environment: str = "production"
 
     # Extension
     extension_origin: str = "chrome-extension://*"

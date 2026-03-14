@@ -3,7 +3,14 @@
 // NOTE: Firebase JS SDK cannot be used in MV3 extension popups (CSP blocks CDN scripts).
 // Auth uses chrome.identity.launchWebAuthFlow() instead.
 
-const BACKEND_WS = 'ws://localhost:8080/ws/';
+// --- ENVIRONMENT CONFIGURATION ---
+const IS_PROD = true; // Set to true for production
+const PROD_DOMAIN = "axis-backend-461115625041.us-central1.run.app"; // We will paste the URL here later
+
+const BACKEND_WS = IS_PROD ? `wss://${PROD_DOMAIN}/ws/` : 'ws://localhost:8080/ws/';
+const BACKEND_WS_CHAT = IS_PROD ? `wss://${PROD_DOMAIN}/ws-chat/` : 'ws://localhost:8080/ws-chat/';
+const BACKEND_HTTP = IS_PROD ? `https://${PROD_DOMAIN}` : 'http://localhost:8080';
+// ---------------------------------
 const SESSION_ID = crypto.randomUUID();
 
 // Google OAuth — replace with your Web client ID from GCP Console > Credentials
