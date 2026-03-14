@@ -93,7 +93,9 @@ const viewSettings = document.getElementById('view-settings');
 const settingsOverlay = document.getElementById('settings-overlay');
 
 const userInitialEl = document.getElementById('user-initial');
+const userPhotoEl = document.getElementById('user-photo');
 const settingsInitialEl = document.getElementById('settings-initial');
+const settingsPhotoEl = document.getElementById('settings-photo');
 const settingsDisplayName = document.getElementById('settings-display-name');
 const settingsEmail = document.getElementById('settings-email');
 
@@ -190,6 +192,14 @@ function openSettings() {
     settingsEmail.textContent = currentUser.email || '';
     const initial = (currentUser.name || currentUser.email || '?').charAt(0).toUpperCase();
     settingsInitialEl.textContent = initial;
+    if (currentUser.picture) {
+      settingsPhotoEl.src = currentUser.picture;
+      settingsPhotoEl.classList.remove('hidden');
+      settingsInitialEl.classList.add('hidden');
+    } else {
+      settingsPhotoEl.classList.add('hidden');
+      settingsInitialEl.classList.remove('hidden');
+    }
     loadRecentSessions();
   }
 }
@@ -308,6 +318,14 @@ function showMainScreen() {
   if (currentUser) {
     const initial = (currentUser.name || currentUser.email || '?').charAt(0).toUpperCase();
     userInitialEl.textContent = initial;
+    if (currentUser.picture) {
+      userPhotoEl.src = currentUser.picture;
+      userPhotoEl.classList.remove('hidden');
+      userInitialEl.classList.add('hidden');
+    } else {
+      userPhotoEl.classList.add('hidden');
+      userInitialEl.classList.remove('hidden');
+    }
     // Populate greeting
     const firstName = (currentUser.name || '').split(' ')[0] || 'there';
     if (idleGreetingEl) idleGreetingEl.textContent = `Nice to see you, ${firstName}!`;

@@ -76,16 +76,25 @@ body.theme-light .home-description{color:#666}
    Screen transitions (home / auth / main)
    --------------------------------------------------------------- */
 .screen{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  overflow-y:auto;
   opacity:0;pointer-events:none;transition:opacity 300ms ease;
+  scrollbar-width:none;
 }
+.screen::-webkit-scrollbar{display:none}
 .screen.active{opacity:1;pointer-events:auto}
 #screen-main.screen{display:block;overflow:hidden}
 
 /* ---------------------------------------------------------------
    Screen 1: HOME
    --------------------------------------------------------------- */
-.home-content{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 32px;width:100%}
+.home-content{
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:48px 32px;width:100%;
+  margin:auto; /* Centers content if height allows, otherwise stays at top */
+  min-height:fit-content;
+}
 .home-logo{margin-bottom:24px}
 .home-logo .compass-icon{filter:drop-shadow(0 0 12px rgba(79,195,247,.4))}
 .home-title{font-size:32px;font-weight:700;color:#e0e0e0;letter-spacing:-.5px;margin-bottom:8px}
@@ -104,7 +113,12 @@ body.theme-light .home-description{color:#666}
 /* ---------------------------------------------------------------
    Screen 2: AUTHENTICATING
    --------------------------------------------------------------- */
-.auth-content{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 32px}
+.auth-content{
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:48px 32px;width:100%;
+  margin:auto;
+  min-height:fit-content;
+}
 .auth-logo{position:relative;margin-bottom:28px}
 .auth-logo .compass-icon{filter:drop-shadow(0 0 16px rgba(79,195,247,.5))}
 .checkmark{position:absolute;bottom:-4px;right:-4px;opacity:0;transform:scale(0);animation:checkmarkAppear 400ms 300ms ease forwards}
@@ -132,11 +146,16 @@ body.theme-light .home-description{color:#666}
 .idle-top-bar{display:flex;justify-content:space-between;align-items:center;padding:16px 20px}
 
 .user-avatar{
-  width:34px;height:34px;border-radius:50%;
+  width:44px;height:44px;border-radius:50%;
   background:rgba(255,255,255,.05);
   border:1.5px solid rgba(255,255,255,.1);
   display:flex;align-items:center;justify-content:center;
-  font-size:14px;font-weight:600;color:#4fc3f7;
+  font-size:16px;font-weight:600;color:#4fc3f7;
+  overflow:hidden;
+}
+.user-photo, .settings-photo{
+  width:100%;height:100%;object-fit:cover;
+  border-radius:50%;
 }
 
 .btn-icon-sm{
@@ -496,10 +515,11 @@ body.theme-light .chat-bubble.user{
 
 .settings-profile{display:flex;flex-direction:column;align-items:center;padding:8px 0 20px}
 .settings-avatar{
-  width:56px;height:56px;border-radius:50%;
+  width:44px;height:44px;border-radius:50%;
   background:linear-gradient(135deg,#4fc3f7,#0288d1);
   display:flex;align-items:center;justify-content:center;
-  font-size:22px;font-weight:700;color:#0d1117;margin-bottom:12px;
+  font-size:18px;font-weight:700;color:#0d1117;margin-bottom:12px;
+  overflow:hidden;
 }
 .settings-name{font-size:16px;font-weight:600;color:#e0e0e0}
 .settings-email{font-size:12px;color:#6b7280;margin-top:2px}
@@ -1075,14 +1095,16 @@ body.theme-light .chat-messages .chat-bubble.user{background:rgba(0,0,0,.08);col
 .view-onboarding {
   background: #080c14;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 32px;
+  padding: 48px 32px;
+  overflow-y: auto;
 }
 .onboarding-content {
   max-width: 320px;
   width: 100%;
+  margin: auto;
+  min-height: fit-content;
 }
 .onboarding-logo {
   margin-bottom: 24px;
@@ -1128,13 +1150,16 @@ body.theme-light .chat-messages .chat-bubble.user{background:rgba(0,0,0,.08);col
 .view-offline {
   background: #080c14;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 32px;
+  padding: 48px 32px;
+  overflow-y: auto;
 }
 .offline-content {
   max-width: 280px;
+  margin: auto;
+  min-height: fit-content;
+  text-align: center;
 }
 .offline-icon {
   font-size: 48px;
