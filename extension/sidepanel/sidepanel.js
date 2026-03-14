@@ -22,6 +22,7 @@ let currentUser = null;
 let currentView = 'idle'; // idle | live | settings
 let wsConnecting = false;
 let sessionEnding = false;
+let activeSources = []; // Store active audio buffer sources for interruption
 let selectedVoice = 'Aoede';
 let selectedPersona = 'Pilot';
 let savedCustomInstructions = '';
@@ -435,6 +436,10 @@ function handleMessage(msg, sock) {
   } else if (msg.type === 'user_transcript' || msg.type === 'input_transcription') {
     if (msg.text) {
       showTranscript(msg.text, 'user', !msg.is_partial);
+      // If user starts speaking, stop agent audio immediately to prevent overlap/lag
+      if (msg.is_partial) {
+        stopAllAudio();
+      }
     }
   } else if (msg.type === 'agent_transcript' || msg.type === 'output_transcription') {
     if (msg.text) {
@@ -454,7 +459,10 @@ function handleMessage(msg, sock) {
   } else if (msg.type === 'session_ended') {
     // Server confirmed session end
   } else if (msg.type === 'turn_complete') {
-    // nothing special
+    if (msg.interrupted) {
+      console.log('[Axis] Agent interrupted, stopping audio');
+      stopAllAudio();
+    }
   } else if (msg.type === 'status') {
     handleStatusMessage(msg);
   } else if (msg.type === 'error') {
@@ -917,10 +925,11 @@ function stopMicOnly() {
 }
 
 // ---------------------------------------------------------------------------
-// Audio playback
+// Audio playback with small Jitter Buffer
 // ---------------------------------------------------------------------------
 const playbackCtx = new AudioContext({ sampleRate: 24000 });
 let nextPlayTime = 0;
+const JITTER_BUFFER_MS = 150; // Delay playback by 150ms to absorb network jitter
 
 // Analyser for agent audio output
 const playbackAnalyser = playbackCtx.createAnalyser();
@@ -931,33 +940,50 @@ function playAudio(base64Data) {
   try {
     const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const samples = new Int16Array(bytes.buffer);
-    const buffer = playbackCtx.createBuffer(1, samples.length, 24000);
-    const ch = buffer.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) ch[i] = samples[i] / 32768.0;
-    const source = playbackCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(playbackAnalyser);
-    const now = playbackCtx.currentTime;
-    if (nextPlayTime < now) nextPlayTime = now;
-    source.start(nextPlayTime);
-    nextPlayTime += buffer.duration;
+    schedulePlayback(samples);
   } catch (e) { /* silent */ }
 }
 
 function playAudioBinary(arrayBuffer) {
   try {
     const samples = new Int16Array(arrayBuffer);
-    const buffer = playbackCtx.createBuffer(1, samples.length, 24000);
-    const ch = buffer.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) ch[i] = samples[i] / 32768.0;
-    const source = playbackCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(playbackAnalyser);
-    const now = playbackCtx.currentTime;
-    if (nextPlayTime < now) nextPlayTime = now;
-    source.start(nextPlayTime);
-    nextPlayTime += buffer.duration;
+    schedulePlayback(samples);
   } catch (e) { /* silent */ }
+}
+
+function stopAllAudio() {
+  activeSources.forEach(s => {
+    try { s.stop(); } catch (e) { /* ignore */ }
+  });
+  activeSources = [];
+  nextPlayTime = 0; // Reset scheduling clock
+}
+
+function schedulePlayback(samples) {
+  const buffer = playbackCtx.createBuffer(1, samples.length, 24000);
+  const ch = buffer.getChannelData(0);
+  for (let i = 0; i < samples.length; i++) ch[i] = samples[i] / 32768.0;
+
+  const source = playbackCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(playbackAnalyser);
+
+  // Track source for potential interruption
+  activeSources.push(source);
+  source.onended = () => {
+    activeSources = activeSources.filter(s => s !== source);
+  };
+
+  const now = playbackCtx.currentTime;
+  
+  // Initialize nextPlayTime if it's in the past
+  if (nextPlayTime < now) {
+    // Add jitter buffer delay on the first chunk of a potential new stream
+    nextPlayTime = now + (JITTER_BUFFER_MS / 1000);
+  }
+
+  source.start(nextPlayTime);
+  nextPlayTime += buffer.duration;
 }
 
 // ---------------------------------------------------------------------------

@@ -176,38 +176,39 @@ def _prune_context(history: list, max_turns: int = 20):
 
     # 1. Prune Images: iterate backwards, keep first image found, strip others
     image_found = False
+    # Use a faster iteration and avoid excessive hasattr checks if possible
     for i in range(len(history) - 1, -1, -1):
         content = history[i]
-        # Content might be types.Content or a dict depending on ADK version
-        parts = getattr(content, 'parts', None)
-        if parts is None and isinstance(content, dict):
-            parts = content.get('parts', [])
+        parts = getattr(content, 'parts', []) if not isinstance(content, dict) else content.get('parts', [])
         
         if not parts:
             continue
             
+        modified = False
         new_parts = []
         for part in parts:
-            # Check for image blob in various formats
             is_image = False
-            if hasattr(part, 'inline_data') and part.inline_data: is_image = True
-            elif hasattr(part, 'data') and part.data: is_image = True
-            elif isinstance(part, dict) and (part.get('inline_data') or part.get('data')): is_image = True
+            # Streamlined check for image blobs
+            if isinstance(part, dict):
+                if part.get('inline_data') or part.get('data'): is_image = True
+            else:
+                if (getattr(part, 'inline_data', None) or getattr(part, 'data', None)): is_image = True
             
             if is_image:
                 if not image_found:
                     new_parts.append(part)
                     image_found = True
                 else:
-                    # Replace with text part
                     new_parts.append(types.Part.from_text(text="[Previous screenshot omitted to save memory]"))
+                    modified = True
             else:
                 new_parts.append(part)
         
-        if hasattr(content, 'parts'):
-            content.parts = new_parts
-        elif isinstance(content, dict):
-            content['parts'] = new_parts
+        if modified:
+            if hasattr(content, 'parts'):
+                content.parts = new_parts
+            elif isinstance(content, dict):
+                content['parts'] = new_parts
 
     # 2. Trim Turns
     if len(history) > max_turns:
@@ -765,15 +766,21 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
                                 if isinstance(resp, dict) and "image_b64" in resp:
                                     try:
                                         logger.info(f"Forwarding image tool result via WS (session={state.session_id})")
-                                        # Ensure we perform a deep copy so we can strip the bytes from the agent's copy (Prompt 2)
-                                        result_to_frontend = copy.deepcopy(resp)
+                                        # Use shallow copy instead of deepcopy to avoid blocking the event loop (Prompt 1)
+                                        # Only copy the top-level keys needed for the frontend
+                                        result_to_frontend = {
+                                            "image_b64": resp.get("image_b64"),
+                                            "mime_type": resp.get("mime_type"),
+                                            "caption": resp.get("caption"),
+                                            "prompt": resp.get("prompt")
+                                        }
                                         await websocket.send_json({
                                             "type": "tool_result",
                                             "tool": "generate_image",
                                             "data": result_to_frontend
                                         })
                                         
-                                        # Strip the image data from the version the agent runner sees (Prompt 2)
+                                        # Strip the image data from the version the agent runner sees
                                         resp["image_b64"] = "[IMAGE_DATA_STRIPPED]"
                                         # The modified resp (now without image bytes) is what the runner's internal
                                         # yield logic uses, ensuring context stays lean.
