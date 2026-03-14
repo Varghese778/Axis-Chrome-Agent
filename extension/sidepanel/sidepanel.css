@@ -1068,3 +1068,90 @@ body.theme-light .chat-messages .chat-bubble.user{background:rgba(0,0,0,.08);col
   background: #dc2626 !important;
   transform: scale(1.02);
 }
+
+/* ---------------------------------------------------------------
+   VIEW G: ONBOARDING
+   --------------------------------------------------------------- */
+.view-onboarding {
+  background: #080c14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px;
+}
+.onboarding-content {
+  max-width: 320px;
+  width: 100%;
+}
+.onboarding-logo {
+  margin-bottom: 24px;
+}
+.onboarding-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 8px;
+}
+.onboarding-intro {
+  font-size: 14px;
+  color: #4fc3f7;
+  margin-bottom: 24px;
+}
+.onboarding-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: left;
+  margin-bottom: 32px;
+}
+.info-item {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+.info-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.info-item strong {
+  color: #e0e0e0;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* ---------------------------------------------------------------
+   VIEW H: OFFLINE
+   --------------------------------------------------------------- */
+.view-offline {
+  background: #080c14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px;
+}
+.offline-content {
+  max-width: 280px;
+}
+.offline-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 0 12px rgba(79, 195, 247, 0.3));
+}
+.offline-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 8px;
+}
+.offline-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 32px;
+}
+#retry-conn-btn {
+  width: 100%;
+}

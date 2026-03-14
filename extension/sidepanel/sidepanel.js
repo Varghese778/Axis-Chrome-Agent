@@ -110,6 +110,12 @@ const liveCanvas = document.getElementById('live-visualizer');
 const chatContainer = document.getElementById('chat-container');
 const recentSessionsDiv = document.getElementById('recent-sessions');
 
+// New Views
+const viewOnboarding = document.getElementById('view-onboarding');
+const onboardingCloseBtn = document.getElementById('onboarding-close-btn');
+const viewOffline = document.getElementById('view-offline');
+const retryConnBtn = document.getElementById('retry-conn-btn');
+
 // Image Modal References
 const imageModal = document.getElementById('image-modal');
 const modalImage = document.getElementById('modal-image');
@@ -129,6 +135,8 @@ function switchView(view) {
   viewIdle.classList.remove('active-view');
   viewLive.classList.remove('active-view');
   if (viewChat) viewChat.classList.remove('active-view');
+  if (viewOnboarding) viewOnboarding.classList.remove('active-view');
+  if (viewOffline) viewOffline.classList.remove('active-view');
   viewSettings.classList.remove('open');
   settingsOverlay.classList.remove('visible');
 
@@ -138,6 +146,10 @@ function switchView(view) {
     viewLive.classList.add('active-view');
   } else if (view === 'chat') {
     if (viewChat) viewChat.classList.add('active-view');
+  } else if (view === 'onboarding') {
+    if (viewOnboarding) viewOnboarding.classList.add('active-view');
+  } else if (view === 'offline') {
+    if (viewOffline) viewOffline.classList.add('active-view');
   } else if (view === 'settings') {
     // Keep current underneath
     if (currentView !== 'settings') {
@@ -279,8 +291,23 @@ function showMainScreen() {
     const firstName = (currentUser.name || '').split(' ')[0] || 'there';
     if (idleGreetingEl) idleGreetingEl.textContent = `Nice to see you, ${firstName}!`;
   }
-  switchView('idle');
+  
+  // Onboarding Logic
+  chrome.storage.local.get(['axis_onboarding_seen'], (data) => {
+    if (!data.axis_onboarding_seen) {
+      switchView('onboarding');
+    } else {
+      switchView('idle');
+    }
+  });
   populateTabSelector();
+}
+
+if (onboardingCloseBtn) {
+  onboardingCloseBtn.addEventListener('click', () => {
+    chrome.storage.local.set({ axis_onboarding_seen: true });
+    switchView('idle');
+  });
 }
 
 function signOutUser() {
@@ -376,18 +403,35 @@ function connectWS(userId, token) {
 
     ws.onerror = () => {
       wsConnecting = false;
+      if (!sessionEnding) switchView('offline');
     };
 
     ws.onclose = () => {
       wsConnecting = false;
       goLiveBtn.disabled = true;
-      if (reconnectAttempts < maxReconnect) {
+      if (!sessionEnding && reconnectAttempts >= maxReconnect) {
+        switchView('offline');
+      }
+      if (!sessionEnding && reconnectAttempts < maxReconnect) {
         setTimeout(doConnect, baseDelay * Math.pow(2, reconnectAttempts));
         reconnectAttempts++;
       }
     };
   }
   doConnect();
+}
+
+if (retryConnBtn) {
+  retryConnBtn.addEventListener('click', () => {
+    if (currentUser) {
+      chrome.storage.local.get(['pp_token'], (data) => {
+        if (data.pp_token) {
+          switchView('idle'); // optimistic switch
+          connectWS(currentUser.id, data.pp_token);
+        }
+      });
+    }
+  });
 }
 
 function disconnectWS() {

@@ -278,8 +278,10 @@
             <div class="about-tagline">Your AI Chrome Agent</div>
           </div>
           <p class="about-description">Axis lets you control any website hands-free using your voice. Powered by Google
-            Gemini Live API, Axis sees your screen, understands your intent, and takes action &mdash; so you never have to
-            touch your keyboard. Axis can now generate stunning images and browse the web with real-time screen understanding.</p>
+            Gemini Live API, Axis sees your screen, understands your intent, and takes action &mdash; so you never have
+            to
+            touch your keyboard. Axis can now generate stunning images and browse the web with real-time screen
+            understanding.</p>
           <div class="about-section-label">HOW TO USE</div>
           <ol class="about-steps">
             <li>Click <strong>Go Live</strong> to start a session</li>
@@ -324,6 +326,48 @@
             <button type="submit" class="btn-pill btn-feedback-submit">Send Feedback</button>
           </form>
           <div id="feedback-success" class="feedback-success hidden"></div>
+        </div>
+      </div>
+
+      <!-- VIEW G: ONBOARDING VIEW -->
+      <div id="view-onboarding" class="view-panel view-onboarding">
+        <div class="onboarding-content">
+          <div class="onboarding-logo">
+            <svg class="compass-icon" viewBox="0 0 64 64" width="64" height="64">
+              <circle cx="32" cy="32" r="30" fill="none" stroke="#4fc3f7" stroke-width="2" />
+              <polygon points="32,8 38,30 32,26 26,30" fill="#4fc3f7" />
+              <polygon points="32,56 26,34 32,38 38,34" fill="#4fc3f7" opacity="0.5" />
+            </svg>
+          </div>
+          <h2 class="onboarding-title">Welcome to Axis</h2>
+          <p class="onboarding-intro">Here's how your AI agent operates:</p>
+          <div class="onboarding-info">
+            <div class="info-item">
+              <span class="info-icon">🕵️</span>
+              <div>
+                <strong>Privacy First:</strong> Use the <em>Restrict Tab</em> feature to keep specific tabs private.
+                Axis can navigate to them but cannot see their content or act on them.
+              </div>
+            </div>
+            <div class="info-item">
+              <span class="info-icon">🔒</span>
+              <div>
+                <strong>Chrome Pages:</strong> For security, Axis cannot execute tasks on internal pages like Settings
+                or Downloads, though it can open them for you.
+              </div>
+            </div>
+          </div>
+          <button id="onboarding-close-btn" class="btn-go-live-pill">Got it, let's go!</button>
+        </div>
+      </div>
+
+      <!-- VIEW H: OFFLINE VIEW -->
+      <div id="view-offline" class="view-panel view-offline">
+        <div class="offline-content">
+          <div class="offline-icon">📡</div>
+          <h2 class="offline-title">402 - System Offline :\</h2>
+          <p class="offline-subtitle">AXIS will be back, Please try again later.</p>
+          <button id="retry-conn-btn" class="btn-go-live-pill">Retry Connection</button>
         </div>
       </div>
 
