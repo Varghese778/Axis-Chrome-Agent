@@ -900,9 +900,22 @@ endSessionBtn.addEventListener('click', () => {
   stopListening();
   setTimeout(() => {
     if (ws) { ws.close(); ws = null; }
+    
+    // Reset state for a fresh session
     SESSION_ID = crypto.randomUUID();
+    sessionEnding = false; // Allow fresh connection
+    
     switchView('idle');
     clearTranscript();
+
+    // Re-initiate "waiting" connection so "Go Live" re-enables
+    if (currentUser) {
+      chrome.storage.local.get(['pp_token'], (data) => {
+        if (data.pp_token) {
+          connectWS(currentUser.id, data.pp_token);
+        }
+      });
+    }
   }, 500);
 });
 
