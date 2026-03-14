@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Axis - Microphone Permission</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #09090b;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .main-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6rem;
+            max-width: 1000px;
+            width: 90%;
+        }
+
+        /* Branding Section (Left) */
+        .branding-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            min-width: 250px;
+        }
+
+        .compass-icon {
+            margin-bottom: 1.5rem;
+            filter: drop-shadow(0 0 15px rgba(79, 195, 247, 0.4));
+        }
+
+        .branding-section h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin: 0;
+            color: #ffffff;
+        }
+
+        .branding-section p {
+            font-size: 1.25rem;
+            color: #4fc3f7;
+            font-weight: 500;
+            margin: 0.5rem 0 0 0;
+        }
+
+        /* Permission Box (Right) */
+        .permission-box {
+            width: 420px;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 2rem;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            position: relative;
+        }
+
+        .permission-box h2 {
+            font-weight: 600;
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            margin-top: 0;
+        }
+
+        .permission-box p {
+            color: #a1a1aa;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+
+        .highlight-note {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.2);
+            color: #60a5fa;
+            padding: 1rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+            margin-bottom: 2rem;
+            text-align: left;
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+
+        .highlight-note b {
+            color: #fff;
+        }
+
+        .btn {
+            background: transparent;
+            color: white;
+            border: 2px solid #2563eb;
+            padding: 1.1rem 2rem;
+            border-radius: 1.1rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: rgba(37, 99, 235, 0.1);
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.2);
+        }
+
+        .success {
+            color: #10b981;
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 850px) {
+            .main-container {
+                flex-direction: column;
+                gap: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- BRANDING (Left) -->
+        <div class="branding-section">
+            <svg class="compass-icon" viewBox="0 0 64 64" width="80" height="80">
+                <circle cx="32" cy="32" r="30" fill="none" stroke="#4fc3f7" stroke-width="2" />
+                <polygon points="32,8 38,30 32,26 26,30" fill="#4fc3f7" />
+                <polygon points="32,56 26,34 32,38 38,34" fill="#4fc3f7" opacity="0.5" />
+            </svg>
+            <h1>Axis</h1>
+            <p>Your AI Chrome Agent.</p>
+        </div>
+
+        <!-- PERMISSION BOX (Right) -->
+        <div class="permission-box">
+            <div id="request-content">
+                <h2>Microphone Access</h2>
+                <p>Axis needs to hear your voice to navigate the web for you.</p>
+                
+                <div class="highlight-note">
+                    <span>💡</span>
+                    <span>For persistent access, please select <b>"Allow while visiting the site"</b> when the browser asks.</span>
+                </div>
+
+                <button id="request-btn" class="btn">Grant Access</button>
+            </div>
+            
+            <div id="success-msg" class="success">
+                <h2>Access Granted!</h2>
+                <p>Everything is ready. You can close this tab and return to the Axis sidepanel.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="permission.js"></script>
+</body>
+</html>

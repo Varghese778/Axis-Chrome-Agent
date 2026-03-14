@@ -21,6 +21,7 @@ let chatWs = null;              // WebSocket for chat sessions (tool bridge)
 let isListening = false;
 let isHolding = false;
 let currentTabId = null;
+let currentWindowId = null;
 let currentUrl = '';
 let currentTitle = '';
 let currentUser = null;
@@ -44,11 +45,22 @@ let micStream = null;
 let micAudioContext = null;
 let micWorkletNode = null;
 
+// Helpers
+function isNewTab(url) {
+  if (!url) return true;
+  const low = url.toLowerCase();
+  return low.startsWith('chrome://newtab') || 
+         low.startsWith('chrome://new-tab-page') || 
+         low.startsWith('about:newtab') || 
+         low.startsWith('chrome://startpageshared');
+}
+
 // Tab change detection
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
     currentTabId = String(tab.id);
+    currentWindowId = tab.windowId;
     currentUrl = tab.url || '';
     currentTitle = tab.title || '';
     if (ws?.readyState === WebSocket.OPEN) sendPageContext(tab, ws);
@@ -56,11 +68,15 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   } catch (e) { /* tab closed */ }
 });
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && String(tabId) === currentTabId) {
+  if (String(tabId) === currentTabId) {
     if (changeInfo.url) currentUrl = changeInfo.url;
     if (changeInfo.title) currentTitle = changeInfo.title;
-    if (ws?.readyState === WebSocket.OPEN) sendPageContext(tab, ws);
-    if (chatWs?.readyState === WebSocket.OPEN) sendPageContext(tab, chatWs);
+    
+    // Send context on any URL/Title change (loading or complete) to prevent desync
+    if (changeInfo.url || changeInfo.title || changeInfo.status === 'complete') {
+      if (ws?.readyState === WebSocket.OPEN) sendPageContext(tab, ws);
+      if (chatWs?.readyState === WebSocket.OPEN) sendPageContext(tab, chatWs);
+    }
   }
 });
 
@@ -296,7 +312,7 @@ function showMainScreen() {
     const firstName = (currentUser.name || '').split(' ')[0] || 'there';
     if (idleGreetingEl) idleGreetingEl.textContent = `Nice to see you, ${firstName}!`;
   }
-  
+
   // Onboarding Logic
   chrome.storage.local.get(['axis_onboarding_seen'], (data) => {
     if (!data.axis_onboarding_seen) {
@@ -346,6 +362,7 @@ function connectWS(userId, token) {
 
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       currentTabId = String(tab.id);
+      currentWindowId = tab.windowId;
       currentUrl = tab.url || '';
       currentTitle = tab.title || '';
 
@@ -448,7 +465,9 @@ function disconnectWS() {
 // ---------------------------------------------------------------------------
 function isRestrictedUrl(url) {
   if (!url) return true;
-  return url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:') || url.startsWith('edge://') || url === 'about:blank';
+  if (isNewTab(url)) return false;
+  const low = url.toLowerCase();
+  return low.startsWith('chrome://') || low.startsWith('chrome-extension://') || low.startsWith('about:') || low.startsWith('edge://') || url === 'about:blank';
 }
 
 function sendPageContext(tab, targetWs) {
@@ -530,7 +549,7 @@ function handleMessage(msg, sock) {
       const activeUrl = tab.url || '';
       const activeTabId = tab.id;
       const restrictedPrefixes = ["chrome://", "about:", "chrome-extension://", "edge://"];
-      const isChromePage = restrictedPrefixes.some(p => activeUrl.toLowerCase().startsWith(p)) || !activeUrl;
+      let isChromePage = (restrictedPrefixes.some(p => activeUrl.toLowerCase().startsWith(p)) || !activeUrl) && !isNewTab(activeUrl);
       const isRestrictedTab = selectedTabs.some(t => t.id === activeTabId);
 
       if (isChromePage || isRestrictedTab) {
@@ -558,7 +577,12 @@ function handleMessage(msg, sock) {
         message: "Taking a look at the screen."
       });
 
-      chrome.runtime.sendMessage({ type: 'capture_screenshot', quality: 80 }, (response) => {
+      chrome.runtime.sendMessage({ 
+        type: 'capture_screenshot', 
+        quality: 80, 
+        windowId: currentWindowId, 
+        tabId: currentTabId 
+      }, (response) => {
         void chrome.runtime.lastError;
         if (!response?.success || !response?.data) {
           if (s?.readyState === WebSocket.OPEN) {
@@ -619,6 +643,19 @@ function handleMessage(msg, sock) {
   } else if (msg.type === 'browser_action') {
     chrome.runtime.sendMessage({ type: 'browser_action', action: msg.action, url: msg.url, tab_query: msg.tab_query }, (response) => {
       void chrome.runtime.lastError;
+      if (response?.success) {
+        // Sync local state immediately on successful navigation/switch
+        if (response.url) currentUrl = response.url;
+        if (response.title) currentTitle = response.title;
+        if (response.tabId) currentTabId = String(response.tabId);
+        
+        // Re-send context so agent knows it has moved
+        chrome.tabs.get(Number(currentTabId), (tab) => {
+          if (!chrome.runtime.lastError && tab) {
+            sendPageContext(tab, s);
+          }
+        });
+      }
       if (s?.readyState === WebSocket.OPEN) {
         s.send(JSON.stringify({ type: 'browser_action_result', success: response?.success || false, error: response?.error || null, message: response?.message || '', tabs: response?.tabs || null, tabId: response?.tabId || null, url: response?.url || null, title: response?.title || null, session_id: SESSION_ID }));
       }
@@ -787,7 +824,10 @@ if (chatAddTabsBtn) {
 // ---------------------------------------------------------------------------
 // Go Live / End Session / Hold
 // ---------------------------------------------------------------------------
-goLiveBtn.addEventListener('click', () => {
+goLiveBtn.addEventListener('click', async () => {
+  const hasPermission = await checkMicPermission();
+  if (!hasPermission) return;
+
   sessionEnding = false;
   if (idleTextInput) idleTextInput.value = '';
   clearTranscript();
@@ -795,6 +835,49 @@ goLiveBtn.addEventListener('click', () => {
   startListening();
   showSilenceDots();
 });
+
+async function checkMicPermission() {
+  try {
+    // navigator.permissions API might not be available or support 'microphone' in all contexts
+    const result = await navigator.permissions.query({ name: 'microphone' });
+    if (result.state === 'granted') return true;
+
+    if (result.state === 'denied') {
+      handleStatusMessage({
+        type: 'status',
+        level: 'error',
+        message: 'Microphone access is blocked. Please open the extension settings and allow microphone access.'
+      });
+      return false;
+    }
+
+    // Attempt to trigger prompt directly
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      return true;
+    } catch (e) {
+      // Direct prompt failed (common in sidepanels), use tab fallback
+      handleStatusMessage({
+        type: 'status',
+        level: 'info',
+        message: 'Opening permission request tab...'
+      });
+      chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel/permission.html') });
+      return false;
+    }
+  } catch (err) {
+    // Fallback if navigator.permissions.query fails
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      return true;
+    } catch (e) {
+      chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel/permission.html') });
+      return false;
+    }
+  }
+}
 
 // Enter key in idle text input → open chat session
 if (idleTextInput) {
@@ -1024,7 +1107,7 @@ function schedulePlayback(samples) {
   };
 
   const now = playbackCtx.currentTime;
-  
+
   // Initialize nextPlayTime if it's in the past
   if (nextPlayTime < now) {
     // Add jitter buffer delay on the first chunk of a potential new stream

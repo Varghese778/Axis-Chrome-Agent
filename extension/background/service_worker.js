@@ -58,26 +58,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Screenshot capture request — from side panel WebSocket relay
   if (message.type === 'capture_screenshot') {
     const quality = message.quality || 25;
-    // Always re-query the active tab at capture time — never use a stored tab ID
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      if (!tab) {
-        sendResponse({ success: false, error: 'no_active_tab' });
-        return;
-      }
-      if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('about:'))) {
-        sendResponse({ success: false, error: 'chrome_page' });
-        return;
-      }
-      // Use an internal retry loop for captureVisibleTab to handle page transitions
-      let attempts = 0;
+    const targetWindowId = message.windowId;
+
+    const isNewTab = (url) => {
+      if (!url) return true;
+      const low = url.toLowerCase();
+      return low.startsWith('chrome://newtab') || 
+             low.startsWith('chrome://new-tab-page') || 
+             low.startsWith('about:newtab') || 
+             low.startsWith('chrome://startpageshared');
+    };
+
+    const performCapture = (winId) => {
+      // Specifically allow new tab variations for capturing
+      chrome.tabs.query({ active: true, windowId: winId }, (tabs) => {
+        const tab = tabs[0];
+        if (tab?.url) {
+          const lowerUrl = tab.url.toLowerCase();
+          const isRestricted = (lowerUrl.startsWith('chrome://') || lowerUrl.startsWith('chrome-extension://') || lowerUrl.startsWith('about:') || lowerUrl.startsWith('edge://')) &&
+                               !isNewTab(lowerUrl);
+          
+          if (isRestricted) {
+            sendResponse({ success: false, error: 'chrome_page' });
+            return;
+          }
+        }
+        
+        let attempts = 0;
       const MAX_CAPTURE_ATTEMPTS = 3;
       const RETRY_DELAY = 250;
 
       const attemptCapture = () => {
         attempts++;
         chrome.tabs.captureVisibleTab(
-          tab.windowId,
+          winId,
           { format: 'jpeg', quality },
           (dataUrl) => {
             if (chrome.runtime.lastError || !dataUrl) {
@@ -90,15 +104,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               sendResponse({ success: false, error: errMsg });
               return;
             }
-            // Strip data:image/jpeg;base64, prefix
             const b64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
             sendResponse({ success: true, data: b64 });
           }
         );
       };
-
       attemptCapture();
-    });
+      });
+    };
+
+    if (targetWindowId) {
+      performCapture(targetWindowId);
+    } else {
+      // Fallback: use last focused window which is usually the one the user is looking at
+      chrome.windows.getLastFocused({ populate: false }, (win) => {
+        performCapture(win.id);
+      });
+    }
     return true; // async response
   }
 

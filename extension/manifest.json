@@ -9,7 +9,9 @@
     "scripting",
     "storage",
     "identity",
-    "sidePanel"
+    "sidePanel",
+    "audio",
+    "offscreen"
   ],
   "host_permissions": [
     "<all_urls>",
