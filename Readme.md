@@ -60,7 +60,7 @@ Our 4-minute demo showcases real-time multimodal interaction and the agent's abi
 ### ☁️ Proof of Deployment (GCP)
 - **Live Endpoint**: [https://axis-backend-461115625041.us-central1.run.app](https://axis-backend-461115625041.us-central1.run.app)
 - **Infrastructure Code**: See [`/infra/main.tf`](./infra/main.tf) for our Terraform configuration and [`/infra/cloudbuild.yaml`](./infra/cloudbuild.yaml) for our deployment pipeline.
-
+https://axis-backend-461115625041.us-central1.run.app
 ---
 
 ## 🧪 Challenges & Learnings
