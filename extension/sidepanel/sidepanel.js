@@ -36,6 +36,7 @@ let ssQuality = 0.5;           // screenshot JPEG quality (hardcoded)
 let selectedTabs = [];          // [{id, title, url, favIconUrl}] — tabs RESTRICTED from screenshots
 let chatSessionId = null;       // current chat session ID
 let chatSessionType = null;     // 'chat' or null
+let deferredReadyMessage = false; // flag to show "Ready" when landing on idle
 
 // Keep service worker alive
 const keepAlivePort = chrome.runtime.connect({ name: 'keepalive' });
@@ -181,6 +182,18 @@ function switchView(view) {
     viewSettings.classList.add('open');
     settingsOverlay.classList.add('visible');
     if (currentUser) loadRecentSessions();
+  }
+
+  // If switching to idle, check for deferred "Ready" message
+  if (view === 'idle' && deferredReadyMessage) {
+    deferredReadyMessage = false;
+    setTimeout(() => {
+      handleStatusMessage({
+        type: 'status',
+        level: 'info',
+        message: 'Ready to go Live!'
+      });
+    }, 500);
   }
 }
 
@@ -1447,7 +1460,7 @@ async function loadRecentSessions() {
       <button class="session-delete" title="Delete">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 0 011 1v2"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
         </svg>
       </button>`;
 
@@ -1907,6 +1920,16 @@ function handleStatusMessage(msg) {
     }
     // Remove all warning banners if there's a fatal error
     container.innerHTML = '';
+    return;
+  }
+
+  // Suppress "Ready to go Live!" messages during onboarding or sign-in
+  const suppressedViews = ['onboarding', 'auth'];
+  const isAuthScreen = screenAuth.classList.contains('active');
+  const isReadyMsg = msg.message && msg.message.toLowerCase().includes('ready to go live');
+
+  if (isReadyMsg && (currentView === 'onboarding' || isAuthScreen)) {
+    deferredReadyMessage = true;
     return;
   }
 

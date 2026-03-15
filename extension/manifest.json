@@ -10,12 +10,10 @@
     "storage",
     "identity",
     "sidePanel",
-    "audio",
     "offscreen"
   ],
   "host_permissions": [
-    "<all_urls>",
-    "chrome://*/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background/service_worker.js",

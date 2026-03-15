@@ -13,20 +13,10 @@ chrome.action.onClicked.addListener((tab) => {
 // ---------------------------------------------------------------------------
 // Ensure content script is loaded on active tab (for tab switches)
 // ---------------------------------------------------------------------------
+// Specifically block only sensitive pages. chrome://newtab is technically okay to run basic scripts on.
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  try {
-    const tab = await chrome.tabs.get(activeInfo.tabId);
-    // Specifically block only sensitive pages. chrome://newtab is technically okay to run basic scripts on.
-    if (tab.url && (tab.url.startsWith('chrome-extension://') || tab.url.startsWith('chrome://settings'))) {
-      return;
-    }
-    await chrome.scripting.executeScript({
-      target: { tabId: activeInfo.tabId },
-      files: ['content/content.js'],
-    });
-  } catch (e) {
-    // Expected to fail on chrome:// or extension pages — ignore
-  }
+  // Manual injection removed to avoid 'Identifier already declared' errors.
+  // manifest.json handles content_scripts automatically.
 });
 
 // ---------------------------------------------------------------------------
