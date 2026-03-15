@@ -1,4 +1,4 @@
-# 🧭 Axis: Gemini-Powered Chrome Extension 
+# 🧭 Axis: Voice-Driven Browser Agent
 
 **Hackathon Category:** UI Navigator ☸️  
 **Agent Framework:** Google Agent Development Kit (ADK) v0.3.0+  
