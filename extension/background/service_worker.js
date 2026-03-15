@@ -44,69 +44,70 @@ chrome.runtime.onConnect.addListener((port) => {
 // ---------------------------------------------------------------------------
 // Message handler — screenshot capture, audio relay, content script commands
 // ---------------------------------------------------------------------------
+const isNewTab = (url) => {
+  if (!url) return true;
+  const low = url.toLowerCase();
+  return low.startsWith('chrome://newtab') || 
+         low.startsWith('chrome://new-tab-page') || 
+         low.startsWith('about:newtab') || 
+         low.startsWith('chrome://startpageshared');
+};
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Screenshot capture request — from side panel WebSocket relay
   if (message.type === 'capture_screenshot') {
-    const quality = message.quality || 25;
+    const quality = message.quality || 50;
     const targetWindowId = message.windowId;
 
-    const isNewTab = (url) => {
-      if (!url) return true;
-      const low = url.toLowerCase();
-      return low.startsWith('chrome://newtab') || 
-             low.startsWith('chrome://new-tab-page') || 
-             low.startsWith('about:newtab') || 
-             low.startsWith('chrome://startpageshared');
-    };
-
     const performCapture = (winId) => {
-      // Specifically allow new tab variations for capturing
       chrome.tabs.query({ active: true, windowId: winId }, (tabs) => {
         const tab = tabs[0];
-        if (tab?.url) {
-          const lowerUrl = tab.url.toLowerCase();
-          const isRestricted = (lowerUrl.startsWith('chrome://') || lowerUrl.startsWith('chrome-extension://') || lowerUrl.startsWith('about:') || lowerUrl.startsWith('edge://')) &&
-                               !isNewTab(lowerUrl);
-          
-          if (isRestricted) {
-            sendResponse({ success: false, error: 'chrome_page' });
-            return;
-          }
+        if (!tab) {
+          sendResponse({ success: false, error: 'no_active_tab_in_window' });
+          return;
+        }
+
+        const lowerUrl = (tab.url || '').toLowerCase();
+        const isRestricted = (lowerUrl.startsWith('chrome://') || lowerUrl.startsWith('chrome-extension://') || lowerUrl.startsWith('about:') || lowerUrl.startsWith('edge://')) &&
+                             !isNewTab(lowerUrl);
+        
+        if (isRestricted) {
+          sendResponse({ success: false, error: 'chrome_page' });
+          return;
         }
         
         let attempts = 0;
-      const MAX_CAPTURE_ATTEMPTS = 3;
-      const RETRY_DELAY = 250;
+        const MAX_CAPTURE_ATTEMPTS = 3;
+        const RETRY_DELAY = 250;
 
-      const attemptCapture = () => {
-        attempts++;
-        chrome.tabs.captureVisibleTab(
-          winId,
-          { format: 'jpeg', quality },
-          (dataUrl) => {
-            if (chrome.runtime.lastError || !dataUrl) {
-              const errMsg = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'empty_result';
-              if (attempts < MAX_CAPTURE_ATTEMPTS) {
-                console.warn(`[Axis] Screenshot attempt ${attempts} failed (${errMsg}), retrying in ${RETRY_DELAY}ms...`);
-                setTimeout(attemptCapture, RETRY_DELAY);
+        const attemptCapture = () => {
+          attempts++;
+          chrome.tabs.captureVisibleTab(
+            winId,
+            { format: 'jpeg', quality },
+            (dataUrl) => {
+              if (chrome.runtime.lastError || !dataUrl) {
+                const errMsg = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'empty_result';
+                if (attempts < MAX_CAPTURE_ATTEMPTS) {
+                  console.warn(`[Axis] Screenshot attempt ${attempts} failed (${errMsg}), retrying in ${RETRY_DELAY}ms...`);
+                  setTimeout(attemptCapture, RETRY_DELAY);
+                  return;
+                }
+                sendResponse({ success: false, error: errMsg });
                 return;
               }
-              sendResponse({ success: false, error: errMsg });
-              return;
+              const b64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+              sendResponse({ success: true, data: b64 });
             }
-            const b64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
-            sendResponse({ success: true, data: b64 });
-          }
-        );
-      };
-      attemptCapture();
+          );
+        };
+        attemptCapture();
       });
     };
 
-    if (targetWindowId) {
+    if (targetWindowId && targetWindowId !== chrome.windows.WINDOW_ID_NONE) {
       performCapture(targetWindowId);
     } else {
-      // Fallback: use last focused window which is usually the one the user is looking at
       chrome.windows.getLastFocused({ populate: false }, (win) => {
         performCapture(win.id);
       });

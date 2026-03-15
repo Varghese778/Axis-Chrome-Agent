@@ -68,6 +68,22 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     if (chatWs?.readyState === WebSocket.OPEN) sendPageContext(tab, chatWs);
   } catch (e) { /* tab closed */ }
 });
+
+// Window focus detection to handle window switches
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, windowId: windowId });
+    if (tab) {
+      currentTabId = String(tab.id);
+      currentWindowId = tab.windowId;
+      currentUrl = tab.url || '';
+      currentTitle = tab.title || '';
+      if (ws?.readyState === WebSocket.OPEN) sendPageContext(tab, ws);
+      if (chatWs?.readyState === WebSocket.OPEN) sendPageContext(tab, chatWs);
+    }
+  } catch (e) { /* window closed */ }
+});
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (String(tabId) === currentTabId) {
     if (changeInfo.url) currentUrl = changeInfo.url;
@@ -525,6 +541,91 @@ function sendPageContext(tab, targetWs) {
 }
 
 // ---------------------------------------------------------------------------
+// Screenshot Helpers
+// ---------------------------------------------------------------------------
+function processScreenshotForTab(tab, s) {
+  const activeUrl = tab.url || '';
+  const activeTabId = tab.id;
+  const restrictedPrefixes = ["chrome://", "about:", "chrome-extension://", "edge://"];
+  let isChromePage = (restrictedPrefixes.some(p => activeUrl.toLowerCase().startsWith(p)) || !activeUrl) && !isNewTab(activeUrl);
+  const isRestrictedTab = selectedTabs.some(t => t.id === activeTabId);
+
+  if (isChromePage || isRestrictedTab) {
+    handleStatusMessage({
+      type: 'status',
+      level: 'info',
+      message: "Restricted, Won't Peek here."
+    });
+    if (s?.readyState === WebSocket.OPEN) {
+      s.send(JSON.stringify({
+        type: 'screenshot_result',
+        data: '',
+        success: false,
+        error: isChromePage ? 'chrome_internal_page' : 'tab_restricted',
+        session_id: SESSION_ID
+      }));
+    }
+    return;
+  }
+
+  // Show "Peek" notification before capturing
+  handleStatusMessage({
+    type: 'status',
+    level: 'info',
+    message: "Taking a look at the screen."
+  });
+
+  chrome.runtime.sendMessage({ 
+    type: 'capture_screenshot', 
+    quality: 80, 
+    windowId: tab.windowId, 
+    tabId: tab.id 
+  }, (response) => {
+    void chrome.runtime.lastError;
+    if (!response?.success || !response?.data) {
+      if (s?.readyState === WebSocket.OPEN) {
+        s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, session_id: SESSION_ID }));
+      }
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const MAX_WIDTH = 960;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_WIDTH) {
+        height = Math.round((height * MAX_WIDTH) / width);
+        width = MAX_WIDTH;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', ssQuality);
+      const compressedB64 = compressedDataUrl.replace(/^data:image\/jpeg;base64,/, '');
+
+      if (s?.readyState === WebSocket.OPEN) {
+        s.send(JSON.stringify({ type: 'screenshot_result', data: compressedB64, success: true, session_id: SESSION_ID }));
+      }
+    };
+
+    img.onerror = (e) => {
+      console.error('[Axis] Screenshot img load error:', e);
+      if (s?.readyState === WebSocket.OPEN) {
+        s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, error: 'img_load_error', session_id: SESSION_ID }));
+      }
+    };
+
+    img.src = 'data:image/jpeg;base64,' + response.data;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Message handler
 // ---------------------------------------------------------------------------
 function handleMessage(msg, sock) {
@@ -569,93 +670,23 @@ function handleMessage(msg, sock) {
       showTranscript(msg.message, 'agent', true);
     }
   } else if (msg.type === 'request_screenshot') {
-    chrome.tabs.get(Number(currentTabId), (tab) => {
+    // Optimization: query the truly active tab in the current window to avoid stale state
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+      let tab = tabs[0];
       if (chrome.runtime.lastError || !tab) {
-        if (s?.readyState === WebSocket.OPEN) {
-          s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, error: 'tab_not_found', session_id: SESSION_ID }));
-        }
-        return;
-      }
-
-      const activeUrl = tab.url || '';
-      const activeTabId = tab.id;
-      const restrictedPrefixes = ["chrome://", "about:", "chrome-extension://", "edge://"];
-      let isChromePage = (restrictedPrefixes.some(p => activeUrl.toLowerCase().startsWith(p)) || !activeUrl) && !isNewTab(activeUrl);
-      const isRestrictedTab = selectedTabs.some(t => t.id === activeTabId);
-
-      if (isChromePage || isRestrictedTab) {
-        handleStatusMessage({
-          type: 'status',
-          level: 'info',
-          message: "Restricted, Won't Peek here."
+        // Fallback to currentTabId if query fails or returns nothing
+        chrome.tabs.get(Number(currentTabId), (fallbackTab) => {
+          if (chrome.runtime.lastError || !fallbackTab) {
+            if (s?.readyState === WebSocket.OPEN) {
+              s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, error: 'tab_not_found', session_id: SESSION_ID }));
+            }
+            return;
+          }
+          processScreenshotForTab(fallbackTab, s);
         });
-        if (s?.readyState === WebSocket.OPEN) {
-          s.send(JSON.stringify({
-            type: 'screenshot_result',
-            data: '',
-            success: false,
-            error: isChromePage ? 'chrome_internal_page' : 'tab_restricted',
-            session_id: SESSION_ID
-          }));
-        }
         return;
       }
-
-      // Show "Peek" notification before capturing
-      handleStatusMessage({
-        type: 'status',
-        level: 'info',
-        message: "Taking a look at the screen."
-      });
-
-      chrome.runtime.sendMessage({ 
-        type: 'capture_screenshot', 
-        quality: 80, 
-        windowId: currentWindowId, 
-        tabId: currentTabId 
-      }, (response) => {
-        void chrome.runtime.lastError;
-        if (!response?.success || !response?.data) {
-          if (s?.readyState === WebSocket.OPEN) {
-            s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, session_id: SESSION_ID }));
-          }
-          return;
-        }
-
-        const img = new Image();
-        img.onload = () => {
-          const MAX_WIDTH = 960;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > MAX_WIDTH) {
-            height = Math.round((height * MAX_WIDTH) / width);
-            width = MAX_WIDTH;
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', ssQuality);
-          const compressedB64 = compressedDataUrl.replace(/^data:image\/jpeg;base64,/, '');
-
-          if (s?.readyState === WebSocket.OPEN) {
-            s.send(JSON.stringify({ type: 'screenshot_result', data: compressedB64, success: true, session_id: SESSION_ID }));
-          }
-        };
-
-        img.onerror = (e) => {
-          console.error('[Axis] Screenshot img load error:', e);
-          if (s?.readyState === WebSocket.OPEN) {
-            s.send(JSON.stringify({ type: 'screenshot_result', data: '', success: false, error: 'img_load_error', session_id: SESSION_ID }));
-          }
-        };
-
-        img.src = 'data:image/jpeg;base64,' + response.data;
-      });
+      processScreenshotForTab(tab, s);
     });
   } else if (msg.type === 'execute_webmcp') {
     chrome.runtime.sendMessage({ type: 'execute_webmcp', tool_name: msg.tool_name, args: msg.args }, (response) => {
