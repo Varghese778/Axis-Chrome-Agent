@@ -970,6 +970,12 @@ endSessionBtn.addEventListener('click', () => {
     switchView('idle');
     clearTranscript();
 
+    handleStatusMessage({
+      type: 'status',
+      level: 'info',
+      message: 'Session Ended, please wait for new Live Session'
+    });
+
     // Re-initiate "waiting" connection so "Go Live" re-enables
     if (currentUser) {
       chrome.storage.local.get(['pp_token'], (data) => {
@@ -984,11 +990,23 @@ endSessionBtn.addEventListener('click', () => {
 holdBtn.addEventListener('click', () => {
   if (isHolding) {
     isHolding = false;
-    holdBtn.textContent = 'Hold';
+    holdBtn.textContent = '⏸️';
+    // Clear the persistent "on hold" banner by sending a new session resumed banner
+    handleStatusMessage({
+      type: 'status',
+      level: 'info',
+      message: 'Session resumed.'
+    });
     startListening();
   } else {
     isHolding = true;
-    holdBtn.textContent = 'Resume';
+    holdBtn.textContent = '▶️';
+    handleStatusMessage({
+      type: 'status',
+      level: 'info',
+      message: 'Session on hold',
+      persistent: true
+    });
     stopMicOnly();
   }
 });
@@ -1112,7 +1130,7 @@ function stopListening() {
   stopMicOnly();
   isListening = false;
   isHolding = false;
-  holdBtn.textContent = 'Pause';
+  holdBtn.textContent = '⏸️';
 }
 
 function stopMicOnly() {
@@ -2002,14 +2020,15 @@ function handleStatusMessage(msg) {
       banner.style.opacity = '0';
       setTimeout(() => banner.remove(), 300);
     }, (msg.countdown * 1000) - 200);
-  } else {
-    // All other banners (info, authenticated without level, etc.) auto-remove after 3.5s
+  }
+  banner.innerHTML = `<span>${icon}</span> <span>${msg.message}${countdownPart}</span>`;
+  container.appendChild(banner);
+
+  // If not persistent and not a warning with countdown, auto-remove
+  if (!msg.persistent && !(level === 'warning' && msg.countdown)) {
     setTimeout(() => {
       banner.style.opacity = '0';
       setTimeout(() => banner.remove(), 300);
     }, 3500);
   }
-
-  banner.innerHTML = `<span>${icon}</span> <span>${msg.message}${countdownPart}</span>`;
-  container.appendChild(banner);
 }
