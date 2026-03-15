@@ -186,8 +186,9 @@
               <span class="limit-icon">🛡️</span>
             </div>
             <h2 class="limit-title">Usage Limit Reached</h2>
-            <p class="limit-desc">Thank you for using Axis! You've reached your trial limit. To continue using Axis, please contact the admin (Settings -> Feedback).</p>
-            
+            <p class="limit-desc">Thank you for using Axis! You've reached your trial limit. To continue using Axis,
+              please contact the admin (Settings -> Feedback).</p>
+
             <div class="usage-stats-grid">
               <div class="usage-item">
                 <span class="usage-label">Input Messages</span>
@@ -196,7 +197,7 @@
                 </div>
                 <span id="input-usage-text" class="usage-value">0 / 0</span>
               </div>
-              
+
               <div class="usage-item">
                 <span class="usage-label">AI Image Generations</span>
                 <div class="usage-bar-bg">
@@ -319,197 +320,206 @@
             </svg>
             <h1 class="about-title">Axis</h1>
             <div class="about-version">Version 2.7.04</div>
-            <div class="about-tagline">Your Personal AI Chrome Agent</div>
-          </div>
-          <p class="about-description">Axis empowers you to control any website hands-free using your voice. Powered by the Google
-            Gemini Live API, Axis intelligently understands your screen and executes tasks on your behalf &mdash; so you can focus on what matters. 
-            From browsing the web to generating stunning AI images, Axis is built to make your digital life easier.</p>
-          
-          <div class="about-section-label">HOW TO USE</div>
-          <ol class="about-steps">
-            <li>Click <strong>Go Live</strong> to start a session</li>
-            <li>Speak your command naturally</li>
-            <li>Axis will analyze and act on the current page</li>
-            <li>Say &ldquo;stop&rdquo; or click <strong>End Session</strong> when done</li>
-          </ol>
-
-          <div class="about-section-label">POWERED BY</div>
-          <ul class="about-powered">
-            <li>Google Gemini Live API</li>
-            <li>Google Cloud Run</li>
-            <li>Chrome Extension MV3</li>
-          </ul>
-
-          <div class="about-built-for">Built for Gemini Live Agent Challenge 2026</div>
-        </div>
-        <div class="about-developer">Developer ~ Sharon Varghese</div>
-      </div>
-
-      <!-- VIEW I: USAGE DASHBOARD -->
-
-      <div id="usage-view" class="view-panel view-slide-panel">
-        <div class="slide-panel-top">
-          <button id="usage-back-btn" class="btn-back">&larr; Back</button>
-        </div>
-        <div class="slide-panel-scroll">
-          <h2 class="usage-title">Usage</h2>
-
-          <!-- Info Box -->
-          <div class="usage-info-box">
-            <div class="usage-info-text">
-              Axis is currently in early development. To keep it free and running smoothly for everyone, usage limits are applied per user account.
+            <div class="about-tagline">Voice-Driven Browser Agent</div>
             </div>
-          </div>
+            <p class="about-description">Axis empowers you to control any website hands-free using your voice. Powered
+              by the Google
+              Gemini Live API, Axis intelligently understands your screen and executes tasks on your behalf &mdash; so
+              you can focus on what matters.
+              From browsing the web to generating stunning AI images, Axis is built to make your digital life easier.
+            </p>
 
-          <!-- Commands Section -->
-          <div class="usage-section">
-            <div class="usage-label">Voice & Chat Commands</div>
-            <div id="usage-commands-remaining" class="usage-stat-number">0 / 0</div>
-            <div class="usage-progress-bar-track">
-              <div id="usage-commands-fill" class="usage-progress-bar-fill safe"></div>
-            </div>
-            <div id="usage-commands-subtext" class="usage-subtext">0 commands used out of 0</div>
-          </div>
+            <div class="about-section-label">HOW TO USE</div>
+            <ol class="about-steps">
+              <li>Click <strong>Go Live</strong> to start a session</li>
+              <li>Speak your command naturally</li>
+              <li>Axis will analyze and act on the current page</li>
+              <li>Say &ldquo;stop&rdquo; or click <strong>End Session</strong> when done</li>
+            </ol>
 
-          <!-- Image Gen Section -->
-          <div class="usage-section">
-            <div class="usage-label">Image Generations</div>
-            <div id="usage-images-remaining" class="usage-stat-number">0 / 0</div>
-            <div class="usage-progress-bar-track">
-              <div id="usage-images-fill" class="usage-progress-bar-fill safe"></div>
-            </div>
-            <div id="usage-images-subtext" class="usage-subtext">0 of 0 image generations used</div>
-          </div>
+            <div class="about-section-label">POWERED BY</div>
+            <ul class="about-powered">
+              <li>Google Gemini Live API</li>
+              <li>Google Cloud Run</li>
+              <li>Chrome Extension MV3</li>
+            </ul>
 
-          <!-- Info Box -->
-          <div class="usage-info-box">
-            <div class="usage-info-text">
-              If you’d like to continue using Axis, please reach out through the Feedback section — I’d love to hear from you.
-            </div>
+            <div class="about-built-for">Built for Gemini Live Agent Challenge 2026</div>
           </div>
-
-          <!-- Request Button -->
-          <button id="usage-request-btn" class="btn-go-live-pill" style="margin-top: 8px; width: 100%;">Request Extended Access</button>
+          <div class="about-developer">Developer ~ Sharon Varghese</div>
         </div>
-      </div>
 
-      <!-- VIEW E: FEEDBACK VIEW -->
-      <div id="view-feedback" class="view-panel view-slide-panel">
-        <div class="slide-panel-top">
-          <button id="feedback-back-btn" class="btn-back">&larr; Back</button>
-        </div>
-        <div class="slide-panel-scroll">
-          <h2 class="feedback-title">Send Feedback</h2>
-          <p class="feedback-subtitle">We'd love to hear from you — whether it's a bug, a feature idea, or a request for more usage!</p>
-          <form id="feedback-form" class="feedback-form">
-            <label class="feedback-label">Type</label>
-            <select id="feedback-type" class="feedback-select" required>
-              <option value="General Feedback" selected>General Feedback</option>
-              <option value="Bug Report">Bug Report</option>
-              <option value="Feature Request">Feature Request</option>
-              <option value="Limit Increase">Request Limit Increase</option>
-              <option value="Other">Other</option>
-            </select>
-            <label class="feedback-label">Subject</label>
-            <input type="text" id="feedback-subject" class="feedback-input" placeholder="Brief summary" required>
-            <label class="feedback-label">Message</label>
-            <textarea id="feedback-message" class="feedback-textarea" placeholder="Describe your feedback in detail..."
-              required></textarea>
-            <label class="feedback-label">Your name (optional)</label>
-            <input type="text" id="feedback-name" class="feedback-input" placeholder="Anonymous">
-            <button type="submit" class="btn-pill btn-feedback-submit">Send Feedback</button>
-          </form>
-          <div id="feedback-success" class="feedback-success hidden"></div>
-        </div>
-      </div>
+        <!-- VIEW I: USAGE DASHBOARD -->
 
-      <!-- VIEW G: ONBOARDING VIEW -->
-      <div id="view-onboarding" class="view-panel view-onboarding">
-        <div class="onboarding-content">
-          <div class="onboarding-logo">
-            <svg class="compass-icon" viewBox="0 0 64 64" width="64" height="64">
-              <circle cx="32" cy="32" r="30" fill="none" stroke="#4fc3f7" stroke-width="2" />
-              <polygon points="32,8 38,30 32,26 26,30" fill="#4fc3f7" />
-              <polygon points="32,56 26,34 32,38 38,34" fill="#4fc3f7" opacity="0.5" />
-            </svg>
+        <div id="usage-view" class="view-panel view-slide-panel">
+          <div class="slide-panel-top">
+            <button id="usage-back-btn" class="btn-back">&larr; Back</button>
           </div>
-          <h2 class="onboarding-title">Welcome to Axis</h2>
-          <p class="onboarding-intro">Before you begin, here are a few important things to know:</p>
-          <div class="onboarding-info">
-            <div class="info-item">
-              <span class="info-icon">🕵️</span>
-              <div>
-                <strong>Privacy First:</strong> Use the <em>Restrict Tab</em> feature to keep specific tabs private.
-                Axis can navigate to them but cannot see their content or act on them.
+          <div class="slide-panel-scroll">
+            <h2 class="usage-title">Usage</h2>
+
+            <!-- Info Box -->
+            <div class="usage-info-box">
+              <div class="usage-info-text">
+                Axis is currently in early development. To keep it free and running smoothly for everyone, usage limits
+                are applied per user account.
               </div>
             </div>
-            <div class="info-item">
-              <span class="info-icon">🔒</span>
-              <div>
-                <strong>Chrome Pages:</strong> For security, Axis cannot execute tasks on internal chrome pages like
-                Settings or Downloads, though it can open them for you.
+
+            <!-- Commands Section -->
+            <div class="usage-section">
+              <div class="usage-label">Voice & Chat Commands</div>
+              <div id="usage-commands-remaining" class="usage-stat-number">0 / 0</div>
+              <div class="usage-progress-bar-track">
+                <div id="usage-commands-fill" class="usage-progress-bar-fill safe"></div>
+              </div>
+              <div id="usage-commands-subtext" class="usage-subtext">0 commands used out of 0</div>
+            </div>
+
+            <!-- Image Gen Section -->
+            <div class="usage-section">
+              <div class="usage-label">Image Generations</div>
+              <div id="usage-images-remaining" class="usage-stat-number">0 / 0</div>
+              <div class="usage-progress-bar-track">
+                <div id="usage-images-fill" class="usage-progress-bar-fill safe"></div>
+              </div>
+              <div id="usage-images-subtext" class="usage-subtext">0 of 0 image generations used</div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="usage-info-box">
+              <div class="usage-info-text">
+                If you’d like to continue using Axis, please reach out through the Feedback section — I’d love to hear
+                from you.
               </div>
             </div>
-            <div class="info-item">
-              <span class="info-icon">🧠</span>
-              <div>
-                <strong>AI Limitations:</strong> Axis may occasionally misunderstand complex instructions.
-                For best results, provide clear and specific tasks.
-              </div>
-            </div>
-            <div class="info-item">
-              <span class="info-icon">💪</span>
-              <div>
-                <strong>User Control:</strong> You remain in control at all times, Pause or stop Axis whenever you want
-                during task execution.
-              </div>
-            </div>
-            <div class="info-item">
-              <span class="info-icon">📧</span>
-              <div>
-                <strong>Feedback:</strong> Axis is in early development. Whether you have a suggestion, found a bug, or need a limit increase, reach out through the <em>Settings → Feedback</em> section!
-              </div>
-            </div>
+
+            <!-- Request Button -->
+            <button id="usage-request-btn" class="btn-go-live-pill" style="margin-top: 8px; width: 100%;">Request
+              Extended Access</button>
           </div>
-          <button id="onboarding-close-btn" class="btn-go-live-pill">Got it, let's go!</button>
         </div>
-      </div>
 
-      <!-- VIEW H: OFFLINE VIEW -->
-      <div id="view-offline" class="view-panel view-offline">
-        <div class="offline-content">
-          <div class="offline-icon">📡</div>
-          <h2 class="offline-title">402 - System Offline :\</h2>
-          <p class="offline-subtitle">Check your Network or try again later.</p>
-          <button id="retry-conn-btn" class="btn-go-live-pill">Retry Connection</button>
+        <!-- VIEW E: FEEDBACK VIEW -->
+        <div id="view-feedback" class="view-panel view-slide-panel">
+          <div class="slide-panel-top">
+            <button id="feedback-back-btn" class="btn-back">&larr; Back</button>
+          </div>
+          <div class="slide-panel-scroll">
+            <h2 class="feedback-title">Send Feedback</h2>
+            <p class="feedback-subtitle">I'd love to hear from you — whether it's a bug, a feature idea, or a request
+              for more usage!</p>
+            <form id="feedback-form" class="feedback-form">
+              <label class="feedback-label">Type</label>
+              <select id="feedback-type" class="feedback-select" required>
+                <option value="General Feedback" selected>General Feedback</option>
+                <option value="Bug Report">Bug Report</option>
+                <option value="Feature Request">Feature Request</option>
+                <option value="Limit Increase">Request Limit Increase</option>
+                <option value="Other">Other</option>
+              </select>
+              <label class="feedback-label">Subject</label>
+              <input type="text" id="feedback-subject" class="feedback-input" placeholder="Brief summary" required>
+              <label class="feedback-label">Message</label>
+              <textarea id="feedback-message" class="feedback-textarea"
+                placeholder="Describe your feedback in detail..." required></textarea>
+              <label class="feedback-label">Your name (optional)</label>
+              <input type="text" id="feedback-name" class="feedback-input" placeholder="Anonymous">
+              <button type="submit" class="btn-pill btn-feedback-submit">Send Feedback</button>
+            </form>
+            <div id="feedback-success" class="feedback-success hidden"></div>
+          </div>
         </div>
-      </div>
 
+        <!-- VIEW G: ONBOARDING VIEW -->
+        <div id="view-onboarding" class="view-panel view-onboarding">
+          <div class="onboarding-content">
+            <div class="onboarding-logo">
+              <svg class="compass-icon" viewBox="0 0 64 64" width="64" height="64">
+                <circle cx="32" cy="32" r="30" fill="none" stroke="#4fc3f7" stroke-width="2" />
+                <polygon points="32,8 38,30 32,26 26,30" fill="#4fc3f7" />
+                <polygon points="32,56 26,34 32,38 38,34" fill="#4fc3f7" opacity="0.5" />
+              </svg>
+            </div>
+            <h2 class="onboarding-title">Welcome to Axis</h2>
+            <p class="onboarding-intro">Before you begin, here are a few important things to know:</p>
+            <div class="onboarding-info">
+              <div class="info-item">
+                <span class="info-icon">🕵️</span>
+                <div>
+                  <strong>Privacy First:</strong> Use the <em>Restrict Tab</em> feature to keep specific tabs private.
+                  Axis can navigate to them but cannot see their content or act on them.
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">🔒</span>
+                <div>
+                  <strong>Chrome Pages:</strong> For security, Axis cannot execute tasks on internal chrome pages like
+                  Settings or Downloads, though it can open them for you.
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">🧠</span>
+                <div>
+                  <strong>AI Limitations:</strong> Axis may occasionally misunderstand complex instructions.
+                  For best results, provide clear and specific tasks.
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">💪</span>
+                <div>
+                  <strong>User Control:</strong> You remain in control at all times, Pause or stop Axis whenever you
+                  want
+                  during task execution.
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">📧</span>
+                <div>
+                  <strong>Feedback:</strong> Axis is in early development. Whether you have a suggestion, found a bug,
+                  or need a limit increase, reach out through the <em>Settings → Feedback</em> section!
+                </div>
+              </div>
+            </div>
+            <button id="onboarding-close-btn" class="btn-go-live-pill">Got it, let's go!</button>
+          </div>
+        </div>
+
+        <!-- VIEW H: OFFLINE VIEW -->
+        <div id="view-offline" class="view-panel view-offline">
+          <div class="offline-content">
+            <div class="offline-icon">📡</div>
+            <h2 class="offline-title">402 - System Offline :\</h2>
+            <p class="offline-subtitle">Check your Network or try again later.</p>
+            <button id="retry-conn-btn" class="btn-go-live-pill">Retry Connection</button>
+          </div>
+        </div>
+
+      </div>
     </div>
-  </div>
 
-  <!-- Lightbox Modal -->
-  <div id="image-modal">
-    <div class="modal-content">
-      <img id="modal-image" src="" alt="Full view">
-      <div class="modal-controls">
-        <button id="modal-download-btn" class="btn-modal btn-modal-download">Download</button>
-        <button id="modal-close-btn" class="btn-modal btn-modal-close">Close</button>
+    <!-- Lightbox Modal -->
+    <div id="image-modal">
+      <div class="modal-content">
+        <img id="modal-image" src="" alt="Full view">
+        <div class="modal-controls">
+          <button id="modal-download-btn" class="btn-modal btn-modal-download">Download</button>
+          <button id="modal-close-btn" class="btn-modal btn-modal-close">Close</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Persistent Error Modal -->
-  <div id="error-modal" class="error-modal hidden">
-    <div class="error-modal-content">
-      <div class="error-icon">⚠️</div>
-      <h2 id="error-title">Service Interrupted</h2>
-      <p id="error-message">The AI service is currently unavailable. Please start a new session to continue.</p>
-      <button id="error-reset-btn" class="btn-pill btn-error-reset">Start New Session</button>
+    <!-- Persistent Error Modal -->
+    <div id="error-modal" class="error-modal hidden">
+      <div class="error-modal-content">
+        <div class="error-icon">⚠️</div>
+        <h2 id="error-title">Service Interrupted</h2>
+        <p id="error-message">The AI service is currently unavailable. Please start a new session to continue.</p>
+        <button id="error-reset-btn" class="btn-pill btn-error-reset">Start New Session</button>
+      </div>
     </div>
-  </div>
 
-  <script src="sidepanel.js"></script>
+    <script src="sidepanel.js"></script>
 </body>
 
 </html>

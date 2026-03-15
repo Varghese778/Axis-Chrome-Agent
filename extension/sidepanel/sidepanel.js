@@ -349,10 +349,27 @@ function signIn() {
         console.log("launchWebAuthFlow callback returned. URL:", responseUrl);
         const errorDiv = document.getElementById('auth-error');
         if (chrome.runtime.lastError || !responseUrl) {
-          console.error('Auth error (chrome.runtime.lastError):', chrome.runtime.lastError);
-          if (errorDiv) {
-            errorDiv.textContent = 'Auth error: ' + (chrome.runtime.lastError?.message || 'No response URL');
+          const errMsg = chrome.runtime.lastError?.message || '';
+          const isCancelled = errMsg.toLowerCase().includes('did not approve') || 
+                              errMsg.toLowerCase().includes('user cancelled') ||
+                              errMsg.toLowerCase().includes('interrupt');
+          
+          if (!isCancelled) {
+            console.error('Auth error (chrome.runtime.lastError):', errMsg || chrome.runtime.lastError || 'No response URL');
+            if (errorDiv) {
+              errorDiv.textContent = 'Auth error: ' + (errMsg || 'No response URL');
+            }
+          } else {
+            console.log("User cancelled authentication flow.");
+            if (errorDiv) errorDiv.textContent = ''; // clear any previous error
           }
+
+          // Show popup message same as "ready to go live"
+          handleStatusMessage({
+            type: 'status',
+            level: 'info',
+            message: 'Sign-in failed, please try again'
+          });
           return;
         }
         if (errorDiv) errorDiv.textContent = '';
@@ -391,6 +408,11 @@ function signIn() {
         } catch (e) {
           console.error("Profile fetch error:", e);
           if (errorDiv) errorDiv.textContent = 'User info fetch failed: ' + e.message;
+          handleStatusMessage({
+            type: 'status',
+            level: 'info',
+            message: 'Sign-in failed, please Try again'
+          });
         }
       }
     );
