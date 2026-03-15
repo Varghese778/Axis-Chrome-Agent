@@ -5,7 +5,12 @@ Exports all Axis agent tools.
 from agent.tools.screenshot_tool import screenshot_tool
 from agent.tools.webmcp_tool import execute_webmcp_tool
 from agent.tools.dom_action_tool import execute_dom_action
-from agent.tools.session_tool import log_session_event
+from agent.tools.session_tool import (
+    log_session_event,
+    end_session_tool,
+    hold_session_tool,
+    resume_session_tool,
+)
 from agent.tools.browser_tool import browser_action
 from agent.tools.plan_tool import plan_and_execute
 
@@ -14,6 +19,9 @@ __all__ = [
     "execute_webmcp_tool",
     "execute_dom_action",
     "log_session_event",
+    "end_session_tool",
+    "hold_session_tool",
+    "resume_session_tool",
     "browser_action",
     "plan_and_execute",
 ]

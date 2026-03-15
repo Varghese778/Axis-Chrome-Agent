@@ -521,21 +521,42 @@ function sendPageContext(tab, targetWs) {
   const s = targetWs || ws;
   const url = tab.url || '';
   const title = tab.title || '';
+
+  // Define manual sidepanel tools to inject
+  const manualTools = [
+    {
+      name: "end_session",
+      description: "End the current live session and return to home screen",
+      input_schema: { type: "object", properties: {} }
+    },
+    {
+      name: "hold_session",
+      description: "Put the live session on hold (pauses the microphone)",
+      input_schema: { type: "object", properties: {} }
+    },
+    {
+      name: "resume_session",
+      description: "Resume the live session from hold (re-activates the microphone)",
+      input_schema: { type: "object", properties: {} }
+    }
+  ];
+
   if (isRestrictedUrl(url)) {
     if (s?.readyState === WebSocket.OPEN) {
-      s.send(JSON.stringify({ type: 'page_context', url, title: title || 'New Tab', webmcp_available: false, webmcp_tools: [], selected_tabs: selectedTabs, session_id: SESSION_ID }));
+      s.send(JSON.stringify({ type: 'page_context', url, title: title || 'New Tab', webmcp_available: false, webmcp_tools: manualTools, selected_tabs: selectedTabs, session_id: SESSION_ID }));
     }
     return;
   }
   chrome.runtime.sendMessage({ type: 'get_webmcp_tools' }, (response) => {
     if (chrome.runtime.lastError) {
       if (s?.readyState === WebSocket.OPEN) {
-        s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: false, webmcp_tools: [], selected_tabs: selectedTabs, session_id: SESSION_ID }));
+        s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: false, webmcp_tools: manualTools, selected_tabs: selectedTabs, session_id: SESSION_ID }));
       }
       return;
     }
+    const combinedTools = [...(response?.tools || []), ...manualTools];
     if (s?.readyState === WebSocket.OPEN) {
-      s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: response?.available || false, webmcp_tools: response?.tools || [], selected_tabs: selectedTabs, session_id: SESSION_ID }));
+      s.send(JSON.stringify({ type: 'page_context', url, title, webmcp_available: response?.available || false, webmcp_tools: combinedTools, selected_tabs: selectedTabs, session_id: SESSION_ID }));
     }
   });
 }
@@ -689,6 +710,29 @@ function handleMessage(msg, sock) {
       processScreenshotForTab(tab, s);
     });
   } else if (msg.type === 'execute_webmcp') {
+    // Handle manual sidepanel tools
+    if (msg.tool_name === 'end_session') {
+      handleEndSession();
+      if (s?.readyState === WebSocket.OPEN) {
+        s.send(JSON.stringify({ type: 'action_result', success: true, session_id: SESSION_ID }));
+      }
+      return;
+    }
+    if (msg.tool_name === 'hold_session') {
+      handleHold();
+      if (s?.readyState === WebSocket.OPEN) {
+        s.send(JSON.stringify({ type: 'action_result', success: true, session_id: SESSION_ID }));
+      }
+      return;
+    }
+    if (msg.tool_name === 'resume_session') {
+      handleResume();
+      if (s?.readyState === WebSocket.OPEN) {
+        s.send(JSON.stringify({ type: 'action_result', success: true, session_id: SESSION_ID }));
+      }
+      return;
+    }
+
     chrome.runtime.sendMessage({ type: 'execute_webmcp', tool_name: msg.tool_name, args: msg.args }, (response) => {
       void chrome.runtime.lastError;
       if (s?.readyState === WebSocket.OPEN) {
@@ -954,7 +998,7 @@ if (idleTextInput) {
   });
 }
 
-endSessionBtn.addEventListener('click', () => {
+function handleEndSession() {
   sessionEnding = true;
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'end_session' }));
@@ -985,29 +1029,43 @@ endSessionBtn.addEventListener('click', () => {
       });
     }
   }, 500);
+}
+
+function handleHold() {
+  if (isHolding) return;
+  isHolding = true;
+  holdBtn.textContent = '▶️';
+  handleStatusMessage({
+    type: 'status',
+    level: 'info',
+    message: 'Session on hold',
+    persistent: true
+  });
+  stopMicOnly();
+}
+
+function handleResume() {
+  if (!isHolding) return;
+  isHolding = false;
+  holdBtn.textContent = '⏸️';
+  // Clear the persistent "on hold" banner by sending a new session resumed banner
+  handleStatusMessage({
+    type: 'status',
+    level: 'info',
+    message: 'Session resumed.'
+  });
+  startListening();
+}
+
+endSessionBtn.addEventListener('click', () => {
+  handleEndSession();
 });
 
 holdBtn.addEventListener('click', () => {
   if (isHolding) {
-    isHolding = false;
-    holdBtn.textContent = '⏸️';
-    // Clear the persistent "on hold" banner by sending a new session resumed banner
-    handleStatusMessage({
-      type: 'status',
-      level: 'info',
-      message: 'Session resumed.'
-    });
-    startListening();
+    handleResume();
   } else {
-    isHolding = true;
-    holdBtn.textContent = '▶️';
-    handleStatusMessage({
-      type: 'status',
-      level: 'info',
-      message: 'Session on hold',
-      persistent: true
-    });
-    stopMicOnly();
+    handleHold();
   }
 });
 

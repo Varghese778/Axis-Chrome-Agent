@@ -34,3 +34,75 @@ async def log_session_event(
     except Exception as e:
         logger.error(f"log_session_event error: {e}")
         return {"success": False, "error": str(e)}
+
+
+async def end_session_tool() -> dict:
+    """
+    End the current live session and return to the home screen.
+    Use this when the user says 'end session', 'stop the session', or similar.
+    """
+    try:
+        from backend.main import session_manager
+        state = session_manager.get_active()
+        if not state:
+            return {"success": False, "error": "No active session"}
+
+        result = await state.execute_webmcp(
+            session_id=state.session_id,
+            tab_id=state.tab_id or "",
+            tool_name="end_session",
+            args={},
+            timeout=5.0,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"end_session_tool error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def hold_session_tool() -> dict:
+    """
+    Pause or put the current live session on hold. This stops the microphone.
+    Use this when the user says 'pause', 'hold session', 'stop listening', or similar.
+    """
+    try:
+        from backend.main import session_manager
+        state = session_manager.get_active()
+        if not state:
+            return {"success": False, "error": "No active session"}
+
+        result = await state.execute_webmcp(
+            session_id=state.session_id,
+            tab_id=state.tab_id or "",
+            tool_name="hold_session",
+            args={},
+            timeout=5.0,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"hold_session_tool error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def resume_session_tool() -> dict:
+    """
+    Resume the live session from hold. This re-activates the microphone.
+    Use this when the user says 'resume', 'start listening again', or similar.
+    """
+    try:
+        from backend.main import session_manager
+        state = session_manager.get_active()
+        if not state:
+            return {"success": False, "error": "No active session"}
+
+        result = await state.execute_webmcp(
+            session_id=state.session_id,
+            tab_id=state.tab_id or "",
+            tool_name="resume_session",
+            args={},
+            timeout=5.0,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"resume_session_tool error: {e}")
+        return {"success": False, "error": str(e)}

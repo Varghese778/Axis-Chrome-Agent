@@ -12,6 +12,9 @@ from agent.tools import (
     log_session_event,
     browser_action,
     plan_and_execute,
+    end_session_tool,
+    hold_session_tool,
+    resume_session_tool,
 )
 from agent.tools.imagegen_tool import generate_image_tool
 
@@ -99,6 +102,15 @@ AFTER CLOSING A TAB:
 log_session_event()
   → Log after completed tasks and form submissions.
 
+end_session_tool()
+  → End the live session and return to home screen. Call this when user says 'stop', 'end session', or similar.
+
+hold_session_tool()
+  → Pause/hold the live session (stops microphone). Call this when user says 'pause', 'hold', or similar.
+
+resume_session_tool()
+  → Resume the live session from hold (re-activates microphone).
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FORMS & DOCUMENTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -141,5 +153,8 @@ root_agent = Agent(
         log_session_event,
         plan_and_execute,
         generate_image_tool,
+        end_session_tool,
+        hold_session_tool,
+        resume_session_tool,
     ],
 )

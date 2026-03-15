@@ -1469,6 +1469,21 @@ CHAT_TOOL_DECLARATIONS = types.Tool(function_declarations=[
             required=["prompt"],
         ),
     ),
+    types.FunctionDeclaration(
+        name="end_session_tool",
+        description="End the current live session and return to home screen. Call this when the user says 'stop', 'end session', or similar.",
+        parameters=types.Schema(type="OBJECT", properties={}),
+    ),
+    types.FunctionDeclaration(
+        name="hold_session_tool",
+        description="Pause/hold the current live session (stops microphone). Call this when the user says 'pause', 'hold', or similar.",
+        parameters=types.Schema(type="OBJECT", properties={}),
+    ),
+    types.FunctionDeclaration(
+        name="resume_session_tool",
+        description="Resume the live session from hold (re-activates microphone). Call this when the user says 'resume', 'start listening again', or similar.",
+        parameters=types.Schema(type="OBJECT", properties={}),
+    ),
 ])
 
 
@@ -1547,6 +1562,24 @@ async def _execute_chat_tool(state: SessionState, tool_name: str, args: dict) ->
                 except Exception as e:
                     logger.error(f"Chat generate_image error: {e}")
                     return {"success": False, "error": str(e)}, None
+
+        elif tool_name == "end_session_tool":
+            result = await state.execute_webmcp(
+                state.session_id, state.tab_id or "", tool_name="end_session", args={}, timeout=5.0
+            )
+            return result, None
+
+        elif tool_name == "hold_session_tool":
+            result = await state.execute_webmcp(
+                state.session_id, state.tab_id or "", tool_name="hold_session", args={}, timeout=5.0
+            )
+            return result, None
+
+        elif tool_name == "resume_session_tool":
+            result = await state.execute_webmcp(
+                state.session_id, state.tab_id or "", tool_name="resume_session", args={}, timeout=5.0
+            )
+            return result, None
 
         else:
             return {"success": False, "error": f"Unknown tool: {tool_name}"}, None
