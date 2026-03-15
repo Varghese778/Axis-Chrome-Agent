@@ -88,7 +88,7 @@ Axis bridges the gap between AI reasoning and browser execution, giving physical
 #### Option A — Use the Hosted Version (Recommended)
 The backend is already live on Google Cloud Run. No setup required.
 
-1. Download the extension zip: [Google Drive](https://drive.google.com/file/d/1OrR553xoaGhMAtra9xBK2s45IyUgAr68/view?usp=sharing)
+1. Download the extension zip: [Google Drive](https://drive.google.com/file/d/1Chchfy7CQhUxtMlPEJh1a40fTOHsAc_J/view?usp=sharing)
 2. Unzip the file
 3. Open Chrome → go to `chrome://extensions`
 4. Enable **Developer Mode** (toggle, top right)

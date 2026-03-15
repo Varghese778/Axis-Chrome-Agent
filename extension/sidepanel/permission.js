@@ -6,14 +6,14 @@ btn.onclick = async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log('Microphone access granted successfully');
-        
+
         // Stop the tracks immediately
         stream.getTracks().forEach(track => track.stop());
-        
+
         const content = document.getElementById('request-content');
         if (content) content.style.display = 'none';
         success.style.display = 'block';
-        
+
         // Automatically close after a delay
         setTimeout(() => {
             console.log('Closing window');
@@ -24,7 +24,7 @@ btn.onclick = async () => {
         // More detailed error message
         let errorMsg = 'Could not access microphone: ' + err.message;
         if (err.name === 'NotAllowedError') {
-            errorMsg = 'Microphone access was denied by the browser. Please click the lock icon in the address bar to reset permissions.';
+            errorMsg = 'Microphone access was denied. Please allow the Mic acces from Extension Settings.';
         } else if (err.name === 'NotFoundError') {
             errorMsg = 'No microphone was found on this device.';
         }
