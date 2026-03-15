@@ -146,6 +146,14 @@ const chatAddTabsBtn = document.getElementById('chat-add-tabs-btn');
 const chatTabDropdown = document.getElementById('chat-tab-dropdown');
 const sessionResumePopup = document.getElementById('session-resume-popup');
 
+// Limit view references
+const viewLimit = document.getElementById('view-limit');
+const limitBackBtn = document.getElementById('limit-back-btn');
+const inputUsageBar = document.getElementById('input-usage-bar');
+const imageUsageBar = document.getElementById('image-usage-bar');
+const inputUsageText = document.getElementById('input-usage-text');
+const imageUsageText = document.getElementById('image-usage-text');
+
 const liveCanvas = document.getElementById('live-visualizer');
 const chatContainer = document.getElementById('chat-container');
 const recentSessionsDiv = document.getElementById('recent-sessions');
@@ -155,6 +163,18 @@ const viewOnboarding = document.getElementById('view-onboarding');
 const onboardingCloseBtn = document.getElementById('onboarding-close-btn');
 const viewOffline = document.getElementById('view-offline');
 const retryConnBtn = document.getElementById('retry-conn-btn');
+
+// Usage Dashboard references
+const viewUsage = document.getElementById('usage-view');
+const usageBackBtn = document.getElementById('usage-back-btn');
+const usageCommandsRemaining = document.getElementById('usage-commands-remaining');
+const usageCommandsFill = document.getElementById('usage-commands-fill');
+const usageCommandsSubtext = document.getElementById('usage-commands-subtext');
+const usageImagesRemaining = document.getElementById('usage-images-remaining');
+const usageImagesFill = document.getElementById('usage-images-fill');
+const usageImagesSubtext = document.getElementById('usage-images-subtext');
+const usageRequestBtn = document.getElementById('usage-request-btn');
+const usageSettingsBtn = document.getElementById('usage-settings-btn');
 
 // Image Modal References
 const imageModal = document.getElementById('image-modal');
@@ -170,34 +190,78 @@ function showScreen(el) {
   el.classList.add('active');
 }
 
+let lastPrimaryView = 'idle';
+
 function switchView(view) {
   currentView = view;
-  viewIdle.classList.remove('active-view');
-  viewLive.classList.remove('active-view');
-  if (viewChat) viewChat.classList.remove('active-view');
-  if (viewOnboarding) viewOnboarding.classList.remove('active-view');
-  if (viewOffline) viewOffline.classList.remove('active-view');
-  viewSettings.classList.remove('open');
-  settingsOverlay.classList.remove('visible');
 
-  if (view === 'idle') {
-    viewIdle.classList.add('active-view');
-  } else if (view === 'live') {
-    viewLive.classList.add('active-view');
-  } else if (view === 'chat') {
-    if (viewChat) viewChat.classList.add('active-view');
-  } else if (view === 'onboarding') {
-    if (viewOnboarding) viewOnboarding.classList.add('active-view');
-  } else if (view === 'offline') {
-    if (viewOffline) viewOffline.classList.add('active-view');
-  } else if (view === 'settings') {
-    // Keep current underneath
-    if (currentView !== 'settings') {
-      // re-show whatever was behind
+  const primaryViews = ['idle', 'live', 'chat', 'limit', 'onboarding', 'offline'];
+  const overlayViews = ['settings', 'usage', 'feedback'];
+
+  // 1. If it's a primary view, update lastPrimaryView
+  if (primaryViews.includes(view)) {
+    lastPrimaryView = view;
+  }
+
+  // 2. Clear AND SET primary views only if new view is a primary view
+  if (primaryViews.includes(view)) {
+    // Hide all primary views
+    viewIdle.classList.remove('active-view');
+    viewLive.classList.remove('active-view');
+    if (viewChat) viewChat.classList.remove('active-view');
+    if (viewOnboarding) viewOnboarding.classList.remove('active-view');
+    if (viewOffline) viewOffline.classList.remove('active-view');
+    if (viewLimit) viewLimit.classList.remove('active-view');
+
+    // Show the target primary view
+    if (view === 'idle') viewIdle.classList.add('active-view');
+    else if (view === 'live') viewLive.classList.add('active-view');
+    else if (view === 'chat' && viewChat) viewChat.classList.add('active-view');
+    else if (view === 'limit' && viewLimit) viewLimit.classList.add('active-view');
+    else if (view === 'onboarding' && viewOnboarding) viewOnboarding.classList.add('active-view');
+    else if (view === 'offline' && viewOffline) viewOffline.classList.add('active-view');
+  }
+
+  // 3. Ensure the underlying primary view IS visible if we are switching to/between overlays
+  if (overlayViews.includes(view)) {
+    const backgroundView = (lastPrimaryView === 'idle') ? viewIdle :
+                           (lastPrimaryView === 'live') ? viewLive :
+                           (lastPrimaryView === 'chat') ? viewChat :
+                           (lastPrimaryView === 'limit') ? viewLimit :
+                           (lastPrimaryView === 'onboarding') ? viewOnboarding :
+                           (lastPrimaryView === 'offline') ? viewOffline : null;
+    if (backgroundView) {
+      backgroundView.classList.add('active-view');
     }
-    viewSettings.classList.add('open');
-    settingsOverlay.classList.add('visible');
-    if (currentUser) loadRecentSessions();
+  }
+
+  // 4. Handle Slide Overlays
+  // Close others when opening one, or close all if switching to primary
+  if (!overlayViews.includes(view)) {
+    // Primary view: close all overlays
+    if (viewUsage) viewUsage.classList.remove('open');
+    if (viewFeedback) viewFeedback.classList.remove('open');
+    viewSettings.classList.remove('open');
+    settingsOverlay.classList.remove('visible');
+  } else {
+    // Specific overlay handling
+    if (view === 'usage') {
+      if (viewUsage) viewUsage.classList.add('open');
+      viewSettings.classList.remove('open');
+      settingsOverlay.classList.remove('visible');
+      if (viewFeedback) viewFeedback.classList.remove('open');
+    } else if (view === 'settings') {
+      viewSettings.classList.add('open');
+      settingsOverlay.classList.add('visible');
+      if (viewUsage) viewUsage.classList.remove('open');
+      if (viewFeedback) viewFeedback.classList.remove('open');
+      if (currentUser) loadRecentSessions();
+    } else if (view === 'feedback') {
+      if (viewFeedback) viewFeedback.classList.add('open');
+      viewSettings.classList.remove('open');
+      settingsOverlay.classList.remove('visible');
+      if (viewUsage) viewUsage.classList.remove('open');
+    }
   }
 
   // If switching to idle, check for deferred "Ready" message
@@ -321,7 +385,7 @@ function signIn() {
           }
           const profile = await resp.json();
           console.log("Profile fetched:", profile.email);
-          currentUser = { id: profile.sub, name: profile.name, email: profile.email, picture: profile.picture };
+          currentUser = { id: profile.email, name: profile.name, email: profile.email, picture: profile.picture };
           chrome.storage.local.set({ pp_user: currentUser, pp_token: accessToken });
           showAuthenticatingScreen(() => { showMainScreen(); connectWS(currentUser.id, accessToken); });
         } catch (e) {
@@ -369,6 +433,7 @@ function showMainScreen() {
     }
   });
   populateTabSelector();
+  updateUsageCounts();
 }
 
 if (onboardingCloseBtn) {
@@ -652,6 +717,18 @@ function processScreenshotForTab(tab, s) {
 function handleMessage(msg, sock) {
   const s = sock || ws;
   console.log('[Axis] WS message:', msg.type, msg.text ? msg.text.slice(0, 80) : '');
+  
+  if (msg.type === 'limit_reached') {
+    showLimitView({ 
+      input_count: msg.input_count, 
+      image_count: msg.image_count,
+      input_limit: msg.input_limit || 150,
+      image_limit: msg.image_limit || 5
+    });
+    if (s === ws) stopListening();
+    return;
+  }
+
   if (msg.type === 'audio_response') {
     playAudio(msg.data);
   } else if (msg.type === 'user_transcript' || msg.type === 'input_transcription') {
@@ -934,6 +1011,9 @@ goLiveBtn.addEventListener('click', async () => {
   const hasPermission = await checkMicPermission();
   if (!hasPermission) return;
 
+  const isLimited = await checkUsageLimit();
+  if (isLimited) return;
+
   sessionEnding = false;
   if (idleTextInput) idleTextInput.value = '';
   clearTranscript();
@@ -987,11 +1067,15 @@ async function checkMicPermission() {
 
 // Enter key in idle text input → open chat session
 if (idleTextInput) {
-  idleTextInput.addEventListener('keydown', (e) => {
+  idleTextInput.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const text = idleTextInput.value.trim();
       if (!text) return;
+
+      const isLimited = await checkUsageLimit();
+      if (isLimited) return;
+
       idleTextInput.value = '';
       openChatSession(text);
     }
@@ -1069,7 +1153,10 @@ holdBtn.addEventListener('click', () => {
   }
 });
 
-settingsBtn.addEventListener('click', openSettings);
+settingsBtn.addEventListener('click', () => {
+  openSettings();
+  updateUsageCounts();
+});
 settingsBackBtn.addEventListener('click', closeSettings);
 settingsOverlay.addEventListener('click', closeSettings);
 
@@ -1100,6 +1187,137 @@ function resetSession() {
       }
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Usage Limits
+// ---------------------------------------------------------------------------
+function updateUsageUI(counts) {
+  const inputCount = counts.input_count || 0;
+  const imageCount = counts.image_count || 0;
+  const inputLimit = counts.input_limit || 150;
+  const imageLimit = counts.image_limit || 5;
+
+  if (inputUsageText) inputUsageText.textContent = `${inputCount} / ${inputLimit}`;
+  if (imageUsageText) imageUsageText.textContent = `${imageCount} / ${imageLimit}`;
+
+  if (inputUsageBar) {
+    const inputWidth = Math.min(100, (inputCount / inputLimit) * 100);
+    inputUsageBar.style.width = `${inputWidth}%`;
+  }
+  if (imageUsageBar) {
+    const imageWidth = Math.min(100, (imageCount / imageLimit) * 100);
+    imageUsageBar.style.width = `${imageWidth}%`;
+  }
+
+  // Update Dashboard View if available
+  if (usageCommandsRemaining) usageCommandsRemaining.textContent = `${inputCount} / ${inputLimit}`;
+  if (usageImagesRemaining) usageImagesRemaining.textContent = `${imageCount} / ${imageLimit}`;
+  
+  if (usageCommandsSubtext) usageCommandsSubtext.textContent = `${inputCount} commands used out of ${inputLimit}`;
+  if (usageImagesSubtext) usageImagesSubtext.textContent = `${imageCount} of ${imageLimit} image generations used`;
+
+  if (usageCommandsFill) {
+    const p = (inputCount / inputLimit) * 100;
+    usageCommandsFill.style.width = `${p}%`;
+    usageCommandsFill.className = 'usage-progress-bar-fill ' + getUsageColorClass(p);
+  }
+  if (usageImagesFill) {
+    const p = (imageCount / imageLimit) * 100;
+    usageImagesFill.style.width = `${p}%`;
+    usageImagesFill.className = 'usage-progress-bar-fill ' + getUsageColorClass(p);
+  }
+}
+
+function getUsageColorClass(percentage) {
+  if (percentage < 70) return 'safe';
+  if (percentage < 90) return 'warning';
+  return 'danger';
+}
+
+function showUsageView() {
+  switchView('usage');
+  loadUsageCounts();
+}
+
+async function loadUsageCounts() {
+  if (!currentUser) return;
+  try {
+    const res = await fetch(`${BACKEND_HTTP}/user-counts/${currentUser.id}`);
+    if (!res.ok) throw new Error("Fetch failed");
+    const data = await res.json();
+    updateUsageUI(data);
+  } catch (e) {
+    console.error("Failed to load usage counts:", e);
+    if (usageCommandsRemaining) usageCommandsRemaining.textContent = "Unable to load";
+    if (usageImagesRemaining) usageImagesRemaining.textContent = "Unable to load";
+  }
+}
+
+function showLimitView(counts) {
+  updateUsageUI(counts);
+  switchView('limit');
+}
+
+async function checkUsageLimit() {
+  if (!currentUser) return false;
+  try {
+    const res = await fetch(`${BACKEND_HTTP}/user-counts/${currentUser.id}`);
+    const data = await res.json();
+    updateUsageUI(data);
+
+    const inputLimit = data.input_limit || 150;
+    const imageLimit = data.image_limit || 5;
+    if (data.input_count >= inputLimit || data.image_count >= imageLimit) {
+      showLimitView(data);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error("Check usage limit failed:", e);
+    return false; 
+  }
+}
+
+async function updateUsageCounts() {
+  if (!currentUser) return;
+  try {
+    const res = await fetch(`${BACKEND_HTTP}/user-counts/${currentUser.id}`);
+    const data = await res.json();
+    updateUsageUI(data);
+    // Silent update, do not switch view
+  } catch (e) {
+    console.error("Failed to update usage counts:", e);
+  }
+}
+
+if (limitBackBtn) {
+  limitBackBtn.addEventListener('click', () => {
+    switchView('idle');
+  });
+}
+
+// Usage Dashboard Listeners
+if (usageSettingsBtn) {
+  usageSettingsBtn.addEventListener('click', showUsageView);
+}
+if (usageBackBtn) {
+  usageBackBtn.addEventListener('click', () => {
+    switchView('settings');
+  });
+}
+if (usageRequestBtn) {
+  usageRequestBtn.addEventListener('click', () => {
+    const feedbackView = document.getElementById('view-feedback');
+    if (feedbackView) {
+      // Hide usage, show feedback
+      viewUsage.classList.remove('open');
+      feedbackView.classList.add('open');
+      // Pre-select 'Limit Increase'
+      const typeSelect = document.getElementById('feedback-type');
+      if (typeSelect) typeSelect.value = 'Limit Increase';
+    }
+  });
 }
 
 // Theme toggle

@@ -40,6 +40,8 @@ class FirestoreClient:
                     "email": email,
                     "display_name": display_name,
                     "last_seen_at": now,
+                    "input_count": firestore.Increment(0), # Ensure it exists without overwriting
+                    "image_count": firestore.Increment(0), 
                 },
                 merge=True,
             )
@@ -50,6 +52,54 @@ class FirestoreClient:
             logger.info(f"upsert_user: {user_id}")
         except Exception as e:
             logger.error(f"upsert_user error: {e}")
+
+    async def get_user_counts(self, user_id: str) -> dict:
+        """Fetch user document and return input/image counts and optional limit overrides."""
+        try:
+            client = self._get_client()
+            doc_ref = client.collection("users").document(user_id)
+            snap = await doc_ref.get()
+            if snap.exists:
+                data = snap.to_dict()
+                return {
+                    "input_count": data.get("input_count", 0),
+                    "image_count": data.get("image_count", 0),
+                    "input_limit": data.get("input_limit"),
+                    "image_limit": data.get("image_limit"),
+                }
+            return {"input_count": 0, "image_count": 0, "input_limit": None, "image_limit": None}
+        except Exception as e:
+            logger.error(f"get_user_counts error: {e}")
+            return {"input_count": 0, "image_count": 0, "input_limit": None, "image_limit": None}
+
+    async def increment_input_count(self, user_id: str) -> int:
+        """Atomically increment input_count."""
+        try:
+            client = self._get_client()
+            doc_ref = client.collection("users").document(user_id)
+            await doc_ref.update({"input_count": firestore.Increment(1)})
+            # We don't return the new count because get() after update is slow
+            # and the requirement says return new count but also says use atomic increment.
+            # I will return the value after a quick fetch if needed, 
+            # but usually for limits we check BEFORE incrementing.
+            # Re-reading: "Return new count". I'll fetch it.
+            snap = await doc_ref.get()
+            return snap.to_dict().get("input_count", 0)
+        except Exception as e:
+            logger.error(f"increment_input_count error: {e}")
+            return 0
+
+    async def increment_image_count(self, user_id: str) -> int:
+        """Atomically increment image_count."""
+        try:
+            client = self._get_client()
+            doc_ref = client.collection("users").document(user_id)
+            await doc_ref.update({"image_count": firestore.Increment(1)})
+            snap = await doc_ref.get()
+            return snap.to_dict().get("image_count", 0)
+        except Exception as e:
+            logger.error(f"increment_image_count error: {e}")
+            return 0
 
     # ------------------------------------------------------------------
     # Session CRUD

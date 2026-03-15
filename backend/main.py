@@ -28,6 +28,7 @@ import csv
 from pypdf import PdfReader
 
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -280,7 +281,7 @@ class SessionState:
 
         # Build per-session agent with persona prefix
         persona_prefix = PERSONA_PREFIXES.get(self.agent_persona, PERSONA_PREFIXES["Pilot"])
-        effective_prompt = persona_prefix + "\n\n" + SYSTEM_PROMPT
+        effective_prompt = persona_prefix + "\n\n" + SYSTEM_PROMPT.replace("5 image generations", f"{settings.limit_images} image generations")
 
         # Insert custom instructions before the SECURITY section
         if self.custom_instructions:
@@ -675,7 +676,30 @@ async def agent_to_client_messaging(websocket: WebSocket, state: SessionState):
                         # PREDICTIVE TRIGGER: Trigger screenshot on first partial word
                         if is_partial:
                             state.trigger_predictive_screenshot()
+                        
+                        # INPUT LIMIT ENFORCEMENT (Voice)
+                        if not is_partial and state.user_id:
+                            counts = await firestore_client.get_user_counts(state.user_id)
+                            # Resolve limits
+                            effective_input_limit = counts.get("input_limit") if counts.get("input_limit") is not None else settings.limit_inputs
+                            effective_image_limit = counts.get("image_limit") if counts.get("image_limit") is not None else settings.limit_images
                             
+                            if counts.get("input_count", 0) >= effective_input_limit:
+                                try:
+                                    await websocket.send_json({
+                                        "type": "limit_reached",
+                                        "limit_type": "input",
+                                        "input_count": counts.get("input_count", 0),
+                                        "input_limit": effective_input_limit,
+                                        "image_count": counts.get("image_count", 0),
+                                        "image_limit": effective_image_limit
+                                    })
+                                    await websocket.close()
+                                except Exception:
+                                    pass
+                                return # Exit agent_to_client_messaging
+                            await firestore_client.increment_input_count(state.user_id)
+
                         now_iso = datetime.now(timezone.utc).isoformat()
                         logger.info(f"Input transcription{' (partial)' if is_partial else ''}: {transcription_text}")
                         try:
@@ -987,7 +1011,7 @@ async def client_to_agent_messaging(
                     pass
 
             elif msg_type == "auth":
-                state.user_id = message.get("user_id", "anonymous")
+                state.user_id = message.get("email", message.get("user_id", "anonymous"))
                 state.user_email = message.get("email", "")
                 state.user_display_name = message.get("display_name", "")
                 state.tab_id = message.get("tab_id")
@@ -1261,6 +1285,27 @@ async def delete_session(user_id: str, session_id: str):
     return {"success": True}
 
 
+@app.get("/user-counts/{user_id}")
+async def get_user_counts_endpoint(user_id: str):
+    """Return user usage counts and remaining balance."""
+    counts = await firestore_client.get_user_counts(user_id)
+    input_count = counts.get("input_count", 0)
+    image_count = counts.get("image_count", 0)
+    
+    # Resolve limits
+    effective_input_limit = counts.get("input_limit") if counts.get("input_limit") is not None else settings.limit_inputs
+    effective_image_limit = counts.get("image_limit") if counts.get("image_limit") is not None else settings.limit_images
+    
+    return {
+        "input_count": input_count,
+        "image_count": image_count,
+        "input_limit": effective_input_limit,
+        "image_limit": effective_image_limit,
+        "input_remaining": max(0, effective_input_limit - input_count),
+        "image_remaining": max(0, effective_image_limit - image_count),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Feedback endpoint
 # ---------------------------------------------------------------------------
@@ -1316,6 +1361,7 @@ async def submit_feedback(payload: FeedbackRequest, request: Request):
 class ImageGenRequest(BaseModel):
     prompt: str
     session_id: str = ""
+    user_id: Optional[str] = None
 
 @app.post("/generate-image")
 @limiter.limit("10/minute")
@@ -1329,6 +1375,24 @@ async def generate_image_endpoint(payload: ImageGenRequest, request: Request):
 
     logger.info(f"Generating image for session={payload.session_id} | Prompt: {payload.prompt[:60]}...")
     
+    # Enforce image limit
+    if payload.user_id:
+        counts = await firestore_client.get_user_counts(payload.user_id)
+        # Resolve limits
+        effective_image_limit = counts.get("image_limit") if counts.get("image_limit") is not None else settings.limit_images
+        
+        if counts.get("image_count", 0) >= effective_image_limit:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "image_limit_reached",
+                    "image_count": counts.get("image_count", 0),
+                    "image_limit": effective_image_limit,
+                    "image_remaining": 0
+                }
+            )
+        await firestore_client.increment_image_count(payload.user_id)
+
     # Broadcast tool_start via WebSocket so UI can show the generating bubble immediately
     if payload.session_id:
         state = session_manager.get(payload.session_id)
@@ -1762,7 +1826,7 @@ async def _chat_ws_reader(websocket: WebSocket, state: SessionState):
                 pass
 
         elif msg_type == "auth":
-            state.user_id = data.get("user_id", "anonymous")
+            state.user_id = data.get("email", data.get("user_id", "anonymous"))
             state.user_email = data.get("email", "")
             state.user_display_name = data.get("display_name", "")
             state.tab_id = data.get("tab_id")
@@ -1790,6 +1854,29 @@ async def _chat_ws_reader(websocket: WebSocket, state: SessionState):
                 pass
 
         elif msg_type == "chat_message":
+            # INPUT LIMIT ENFORCEMENT (Text)
+            if state.user_id:
+                counts = await firestore_client.get_user_counts(state.user_id)
+                # Resolve limits
+                effective_input_limit = counts.get("input_limit") if counts.get("input_limit") is not None else settings.limit_inputs
+                effective_image_limit = counts.get("image_limit") if counts.get("image_limit") is not None else settings.limit_images
+                
+                if counts.get("input_count", 0) >= effective_input_limit:
+                    try:
+                        await websocket.send_json({
+                            "type": "limit_reached",
+                            "limit_type": "input",
+                            "input_count": counts.get("input_count", 0),
+                            "input_limit": effective_input_limit,
+                            "image_count": counts.get("image_count", 0),
+                            "image_limit": effective_image_limit
+                        })
+                        await websocket.close()
+                    except Exception:
+                        pass
+                    break # Exit _chat_ws_reader
+                await firestore_client.increment_input_count(state.user_id)
+
             # Chat throttle: 60 messages per minute (1 per second)
             now = datetime.now(timezone.utc).timestamp()
             state._chat_throttle_timestamps = [t for t in state._chat_throttle_timestamps if t > now - 60.0]
@@ -1877,12 +1964,38 @@ async def _chat_message_processor(websocket: WebSocket, state: SessionState):
         text = await state._chat_message_queue.get()
         if not text:
             continue
+
+        # INPUT LIMIT ENFORCEMENT (Chat)
+        if state.user_id:
+            counts = await firestore_client.get_user_counts(state.user_id)
+            effective_input_limit = counts.get("input_limit") if counts.get("input_limit") is not None else settings.limit_inputs
+            effective_image_limit = counts.get("image_limit") if counts.get("image_limit") is not None else settings.limit_images
+            
+            if counts.get("input_count", 0) >= effective_input_limit:
+                try:
+                    await websocket.send_json({
+                        "type": "limit_reached",
+                        "limit_type": "input",
+                        "input_count": counts.get("input_count", 0),
+                        "input_limit": effective_input_limit,
+                        "image_count": counts.get("image_count", 0),
+                        "image_limit": effective_image_limit
+                    })
+                    await websocket.close()
+                except Exception:
+                    pass
+                break # Exit processor loop
+
         try:
             await websocket.send_json({"type": "chat_thinking"})
             reply = await _run_chat_agent(state, text)
             await websocket.send_json({"type": "chat_response", "text": reply})
+            
             now = datetime.now(timezone.utc).isoformat()
             if state.user_id:
+                # Increment count for successful chat exchange
+                await firestore_client.increment_input_count(state.user_id)
+                
                 asyncio.create_task(
                     firestore_client.append_transcript(
                         state.user_id, state.session_id, "user", text, now

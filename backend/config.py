@@ -35,7 +35,12 @@ class Settings(BaseSettings):
     # Feedback SMTP
     feedback_sender_email: str = ""
     feedback_sender_app_password: str = ""
-    feedback_recipient_email: str = ""
+    # Personalize Axis
+    # ... existing fields ...
+
+    # Usage Limits
+    limit_inputs: int = 15
+    limit_images: int = 5
 
 
 @lru_cache()

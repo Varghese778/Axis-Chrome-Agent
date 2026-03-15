@@ -90,7 +90,7 @@ function signIn() {
         const profile = await resp.json();
 
         currentUser = {
-          id: profile.sub,
+          id: profile.email,
           name: profile.name,
           email: profile.email,
         };
