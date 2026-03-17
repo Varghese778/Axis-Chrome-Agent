@@ -115,7 +115,7 @@ class FirestoreClient:
             doc_ref = (
                 client.collection("users")
                 .document(user_id)
-                .collection("sessions")
+                .collection(settings.firestore_collection)
                 .document(session_id)
             )
             await doc_ref.set(
@@ -144,7 +144,7 @@ class FirestoreClient:
             doc_ref = (
                 client.collection("users")
                 .document(user_id)
-                .collection("sessions")
+                .collection(settings.firestore_collection)
                 .document(session_id)
             )
             await doc_ref.set(
@@ -168,7 +168,7 @@ class FirestoreClient:
             doc_ref = (
                 client.collection("users")
                 .document(user_id)
-                .collection("sessions")
+                .collection(settings.firestore_collection)
                 .document(session_id)
             )
             await doc_ref.set(
@@ -189,7 +189,7 @@ class FirestoreClient:
             sessions_ref = (
                 client.collection("users")
                 .document(user_id)
-                .collection("sessions")
+                .collection(settings.firestore_collection)
             )
             docs = await sessions_ref.get()
             results = []
@@ -219,7 +219,7 @@ class FirestoreClient:
             doc_ref = (
                 client.collection("users")
                 .document(user_id)
-                .collection("sessions")
+                .collection(settings.firestore_collection)
                 .document(session_id)
             )
             snap = await doc_ref.get()
@@ -237,7 +237,7 @@ class FirestoreClient:
             doc_ref = (
                 client.collection("users")
                 .document(user_id)
-                .collection("sessions")
+                .collection(settings.firestore_collection)
                 .document(session_id)
             )
             await doc_ref.delete()
@@ -256,7 +256,7 @@ class FirestoreClient:
             ref = (
                 client.collection("users")
                 .document(user_id)
-                .collection("sessions")
+                .collection(settings.firestore_collection)
                 .document(session_id)
                 .collection("files")
                 .document(file_id)

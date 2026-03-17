@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # Server
     host: str = "0.0.0.0"
     port: int = 8080
+    backend_url: str = "https://axis-backend-461115625041.us-central1.run.app"
     environment: str = "production"
 
     # Extension
@@ -35,6 +36,7 @@ class Settings(BaseSettings):
     # Feedback SMTP
     feedback_sender_email: str = ""
     feedback_sender_app_password: str = ""
+    feedback_recipient_email: str = ""
     # Personalize Axis
     # ... existing fields ...
 

@@ -1206,6 +1206,15 @@ async def client_to_agent_messaging(
                         pass
                 except Exception as doc_err:
                     logger.error(f"Failed to parse document {filename}: {doc_err}")
+                    try:
+                        await websocket.send_json({
+                            "type": "status",
+                            "level": "error",
+                            "message": f"Failed to parse document: {filename}",
+                            "detail": str(doc_err)
+                        })
+                    except Exception:
+                        pass
 
         except WebSocketDisconnect:
             logger.info(f"Client disconnected: {state.session_id}")
@@ -1619,7 +1628,7 @@ async def _execute_chat_tool(state: SessionState, tool_name: str, args: dict) ->
             import httpx
             async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
-                    resp = await client.post("https://axis-backend-461115625041.us-central1.run.app/generate-image", json={"prompt": prompt, "session_id": state.session_id})
+                    resp = await client.post(f"{settings.backend_url}/generate-image", json={"prompt": prompt, "session_id": state.session_id})
                     resp.raise_for_status()
                     result = resp.json()
                     return result, None
@@ -1832,6 +1841,11 @@ async def _chat_ws_reader(websocket: WebSocket, state: SessionState):
             state.tab_id = data.get("tab_id")
             state.page_url = data.get("page_url", "")
             state.page_title = data.get("page_title", "")
+            # Sync personalization settings for chat sessions
+            state.agent_voice = data.get("voice", "Aoede")
+            state.agent_persona = data.get("persona", "Pilot")
+            state.custom_instructions = data.get("custom_instructions", "")
+            
             asyncio.create_task(
                 firestore_client.upsert_user(
                     user_id=state.user_id,
@@ -1945,17 +1959,31 @@ async def _chat_ws_reader(websocket: WebSocket, state: SessionState):
             filename = data.get("filename", "file")
             file_b64 = data.get("data", "")
             mime_type = data.get("mime_type", "")
-            if state.user_id:
-                asyncio.create_task(
-                    firestore_client.store_session_file(
-                        user_id=state.user_id,
-                        session_id=state.session_id,
-                        filename=filename,
-                        mime_type=mime_type,
-                        data=file_b64,
+            try:
+                if state.user_id:
+                    asyncio.create_task(
+                        firestore_client.store_session_file(
+                            user_id=state.user_id,
+                            session_id=state.session_id,
+                            filename=filename,
+                            mime_type=mime_type,
+                            data=file_b64,
+                        )
                     )
-                )
-            state.documents[filename] = f"[Binary file: {filename}, type: {mime_type}]"
+                state.documents[filename] = f"[Binary file: {filename}, type: {mime_type}]"
+                # If it's a text/PDF/CSV, we might want to extract it here too 
+                # similar to document_upload, but the current code just stores it as a binary placeholder.
+            except Exception as e:
+                logger.error(f"Chat file_upload error: {e}")
+                try:
+                    await websocket.send_json({
+                        "type": "status",
+                        "level": "error",
+                        "message": f"Failed to upload file: {filename}",
+                        "detail": str(e)
+                    })
+                except Exception:
+                    pass
 
 
 async def _chat_message_processor(websocket: WebSocket, state: SessionState):

@@ -43,6 +43,7 @@ system_check.py
 analyze_logs.py
 id.py
 tests/
+Demo Video.mp4
 
 # Terraform
 .terraform/
