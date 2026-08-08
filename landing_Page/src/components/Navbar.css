@@ -1,0 +1,104 @@
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 1.15rem 0;
+  transition: background-color 0.2s ease, padding 0.2s ease, border-color 0.2s ease;
+  background-color: var(--c-spruce-green);
+  border-bottom: 1px solid rgba(232, 201, 207, 0.15);
+}
+
+.navbar--scrolled {
+  background-color: rgba(4, 40, 40, 0.95);
+  backdrop-filter: blur(12px);
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.navbar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.navbar__brand-name {
+  font-family: var(--font-sans);
+  font-weight: 900;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.navbar__trademark {
+  font-size: 0.65rem;
+  vertical-align: super;
+  font-weight: 500;
+  color: var(--c-dusty-rose);
+}
+
+.navbar__nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.navbar__link {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.2s;
+}
+
+.navbar__link:hover {
+  color: var(--c-dusty-rose);
+}
+
+.navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navbar__github-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--c-spruce-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.navbar__github-btn:hover {
+  border-color: var(--c-terracotta);
+  color: var(--c-dusty-rose);
+  background-color: var(--c-spruce-card);
+}
+
+.navbar__cta {
+  padding: 9px 18px;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .navbar__nav {
+    display: none;
+  }
+}

@@ -1,0 +1,79 @@
+.showcase {
+  padding: var(--section-pad);
+  background-color: var(--c-spruce-green);
+}
+
+.showcase__dark-card {
+  background-color: var(--c-spruce-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 3.5rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 3.5rem;
+  align-items: center;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.showcase__left-visual {
+  width: 100%;
+}
+
+/* Hands + Yellow Folder Graphic Box */
+.showcase__graphic-container {
+  background-color: var(--c-spruce-green);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+}
+
+.showcase__graphic-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.showcase__right-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.showcase__title {
+  color: var(--text-primary);
+  margin-bottom: 1.25rem;
+}
+
+.showcase__desc {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.showcase__subdesc {
+  color: var(--text-muted);
+  margin-bottom: 2.25rem;
+}
+
+.showcase__github-btn {
+  background-color: var(--c-terracotta);
+  color: #FFFFFF;
+  padding: 13px 26px;
+}
+
+.showcase__github-btn:hover {
+  background-color: #8C471C;
+}
+
+@media (max-width: 900px) {
+  .showcase__dark-card {
+    grid-template-columns: 1fr;
+    padding: 2.25rem;
+    gap: 2.25rem;
+  }
+}

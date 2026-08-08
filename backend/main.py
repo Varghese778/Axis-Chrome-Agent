@@ -1628,7 +1628,7 @@ async def _execute_chat_tool(state: SessionState, tool_name: str, args: dict) ->
             import httpx
             async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
-                    resp = await client.post(f"{settings.backend_url}/generate-image", json={"prompt": prompt, "session_id": state.session_id})
+                    resp = await client.post(f"{settings.backend_url}/generate-image", json={"prompt": prompt, "session_id": state.session_id, "user_id": state.user_id})
                     resp.raise_for_status()
                     result = resp.json()
                     return result, None

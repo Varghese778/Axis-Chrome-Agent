@@ -10,3 +10,4 @@ extension.pem
 __pycache__/
 *.pyc
 .env.example
+landing_Page/

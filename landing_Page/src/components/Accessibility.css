@@ -1,0 +1,125 @@
+.a11y {
+  padding: var(--section-pad);
+  background-color: var(--c-spruce-green);
+  border-top: 1px solid var(--border-color);
+}
+
+.a11y__header {
+  text-align: center;
+  margin-bottom: 4.5rem;
+}
+
+.a11y__title {
+  margin-bottom: 1rem;
+}
+
+.a11y__subtitle {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+/* 3 Cards Grid */
+.a11y__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 4.5rem;
+}
+
+.a11y__card {
+  background-color: var(--c-spruce-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.a11y__card:hover {
+  transform: translateY(-3px);
+  border-color: var(--c-terracotta);
+}
+
+.a11y__card-tag {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--c-dusty-rose);
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+.a11y__card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.a11y__card-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Quote Card */
+.a11y__quote-card {
+  background-color: var(--c-spruce-dark);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 3rem;
+  max-width: 860px;
+  margin: 0 auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.a11y__quote-text {
+  font-size: 1.08rem;
+  color: var(--text-primary);
+  line-height: 1.7;
+  font-weight: 500;
+  margin-bottom: 2rem;
+  font-style: italic;
+}
+
+.a11y__quote-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.a11y__quote-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background-color: var(--c-terracotta);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.a11y__quote-author {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.a11y__quote-role {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .a11y__grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .a11y__quote-card {
+    padding: 2rem;
+  }
+}

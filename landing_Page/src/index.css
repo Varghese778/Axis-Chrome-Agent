@@ -1,0 +1,267 @@
+/* ================================================================
+   AXIS Landing Page — Midcentury Touch (Deep Spruce Dark Mode)
+   Primary BG: #063737 (Deep Spruce Green - The Dark One)
+   Page Text:  #FAF6F0 (Ivory White - High Contrast)
+   Accents:    #A25524 (Terracotta Rust), #808000 (Olive), #E8C9CF (Dusty Rose)
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Exact Midcentury Touch Hex Colors */
+  --c-spruce-green:  #063737;
+  --c-spruce-dark:   #042828;
+  --c-spruce-card:   #094747;
+  --c-spruce-hover:  #0D5555;
+  
+  --c-ivory-cream:   #FAF6F0;
+  --c-terracotta:    #A25524;
+  --c-olive-green:   #808000;
+  --c-dusty-rose:    #E8C9CF;
+
+  /* Theme Mapping (Dark Spruce Base) */
+  --bg-page:         var(--c-spruce-green);
+  --bg-hero:         var(--c-spruce-green);
+  --bg-card:         var(--c-spruce-card);
+  --bg-card-alt:     var(--c-spruce-dark);
+  --bg-dark-card:    var(--c-spruce-dark);
+  
+  /* High-Contrast Text Colors for Deep Spruce BG */
+  --text-primary:    var(--c-ivory-cream);
+  --text-secondary:  var(--c-dusty-rose);
+  --text-muted:      #B2D8D8;
+  --text-dark:       var(--c-spruce-green);
+  
+  /* Accents & Borders */
+  --accent-rust:     var(--c-terracotta);
+  --accent-olive:    var(--c-olive-green);
+  --border-color:    rgba(232, 201, 207, 0.22);
+  --border-strong:   var(--c-terracotta);
+
+  /* Premium Typography Stack */
+  --font-display:    'Outfit', -apple-system, sans-serif;
+  --font-serif:      'Instrument Serif', Georgia, serif;
+  --font-sans:       'Plus Jakarta Sans', -apple-system, sans-serif;
+  --font-mono:       'JetBrains Mono', monospace;
+
+  /* Layout Spacing */
+  --container-width: 1120px;
+  --section-pad:     7.5rem 1.5rem;
+  --section-pad-sm:  4.5rem 1.5rem;
+  --radius-sm:       8px;
+  --radius-md:       16px;
+  --radius-lg:       24px;
+  --radius-pill:     9999px;
+}
+
+/* Base Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Navbar Scroll Margin Offset */
+section, [id] {
+  scroll-margin-top: 90px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* Layout Container */
+.container {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* Retro Monospace Tag */
+.mono-tag {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-dusty-rose);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.mono-tag::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background-color: var(--c-terracotta);
+  border-radius: 2px;
+}
+
+/* Typography Hierarchy (High Contrast Ivory White) */
+.heading-xl {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 5.2vw, 4.4rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: var(--text-primary);
+}
+
+.heading-lg {
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 3.6vw, 3rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.heading-md {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.body-lead {
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  line-height: 1.68;
+}
+
+.body-sm {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Underline Highlight in Terracotta Rust */
+.u-line {
+  position: relative;
+  display: inline-block;
+  color: var(--c-ivory-cream);
+}
+
+.u-line::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  width: 100%;
+  height: 4px;
+  background-color: var(--c-terracotta);
+  border-radius: 2px;
+}
+
+/* Terracotta & Dusty Rose Solid Buttons */
+.btn-black {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: var(--c-terracotta);
+  color: #FFFFFF;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.btn-black:hover {
+  background-color: #8C471C;
+  transform: translateY(-1px);
+}
+
+.btn-yellow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: var(--c-terracotta);
+  color: #FFFFFF;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.btn-yellow:hover {
+  background-color: #8C471C;
+  transform: translateY(-1px);
+}
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--c-spruce-dark);
+  color: var(--c-ivory-cream);
+  border: 1px solid var(--border-color);
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.btn-pill:hover {
+  border-color: var(--c-terracotta);
+  color: var(--c-dusty-rose);
+  background-color: var(--c-spruce-card);
+}
+
+/* Partner Badge */
+.badge-partner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--c-spruce-dark);
+  border: 1px solid var(--border-color);
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-dusty-rose);
+}

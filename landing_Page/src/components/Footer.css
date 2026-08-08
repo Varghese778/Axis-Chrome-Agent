@@ -1,0 +1,96 @@
+.footer {
+  background-color: var(--c-spruce-dark);
+  border-top: 1px solid var(--border-color);
+  padding: 4.5rem 0 2.5rem;
+}
+
+.footer__top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4rem;
+  padding-bottom: 4rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.footer__brand-col {
+  max-width: 340px;
+}
+
+.footer__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.footer__tagline {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.footer__links-cols {
+  display: flex;
+  gap: 4rem;
+}
+
+.footer__col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.footer__link {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+
+.footer__link:hover {
+  color: var(--c-dusty-rose);
+}
+
+.footer__bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer__copy {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.footer__badges {
+  display: flex;
+  gap: 8px;
+}
+
+.footer__pill {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  background-color: var(--c-spruce-card);
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: var(--c-dusty-rose);
+}
+
+@media (max-width: 768px) {
+  .footer__top-row {
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .footer__links-cols {
+    gap: 2rem;
+  }
+}

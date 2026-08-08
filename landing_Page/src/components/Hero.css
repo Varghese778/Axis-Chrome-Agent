@@ -1,0 +1,176 @@
+.hero {
+  position: relative;
+  background-color: var(--c-spruce-green);
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.hero__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.hero__badge-row {
+  margin-bottom: 1.75rem;
+}
+
+.hero__title {
+  max-width: 820px;
+  margin-bottom: 1.25rem;
+}
+
+.hero__subtitle {
+  max-width: 580px;
+  margin-bottom: 2.75rem;
+  color: var(--text-secondary);
+}
+
+/* Callout Box (Spruce Dark Container) */
+.hero__callout-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  background-color: var(--c-spruce-dark);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 2rem;
+  max-width: 740px;
+  width: 100%;
+  margin-bottom: 4.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.hero__callout-text-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.hero__callout-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.hero__callout-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.hero__callout-btn {
+  flex-shrink: 0;
+}
+
+/* Bottom Grid (Centered Layout) */
+.hero__bottom-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rem;
+  width: 100%;
+  text-align: center;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.hero__bottom-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* Health Box */
+.hero__health-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--c-spruce-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px 18px;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.hero__health-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.hero__health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22C55E;
+  box-shadow: 0 0 6px #22C55E;
+}
+
+.hero__health-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--c-dusty-rose);
+  transition: opacity 0.2s;
+}
+
+.hero__health-link:hover {
+  opacity: 0.75;
+}
+
+/* Icons Row */
+.hero__icons-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.hero__icon-card {
+  width: 44px;
+  height: 44px;
+  background-color: var(--c-spruce-dark);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-dusty-rose);
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.hero__icon-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--c-terracotta);
+  color: var(--c-terracotta);
+}
+
+@media (max-width: 860px) {
+  .hero__callout-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 1.25rem;
+  }
+  
+  .hero__callout-text-group {
+    align-items: center;
+  }
+
+  .hero__bottom-grid {
+    flex-direction: column;
+    gap: 2rem;
+  }
+}
